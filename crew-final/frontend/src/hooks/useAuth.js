@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext({
@@ -43,6 +43,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Track whether we've loaded the initial session — prevents resetting on TOKEN_REFRESHED
+  const initialLoadDone = useRef(false);
 
   const refreshProfile = useCallback(async () => {
     const uid = session?.user?.id || user?.id;
@@ -60,28 +62,43 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true;
 
-    // CRITICAL FIX: remove getSession() entirely.
-    // onAuthStateChange fires INITIAL_SESSION immediately on mount with
-    // the current session — so getSession is redundant AND causes the
-    // Web Lock conflict that freezes "Saving..." and drops profiles on navigation.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         if (!mounted) return;
+
+        // On TOKEN_REFRESHED: update session silently, don't reset profile
+        if (event === 'TOKEN_REFRESHED' && initialLoadDone.current) {
+          setSession(newSession);
+          setUser(newSession?.user ?? null);
+          return;
+        }
+
         setSession(newSession);
         setUser(newSession?.user ?? null);
+
         if (newSession?.user) {
           const p = await ensureProfile(newSession.user.id, newSession.user.email);
           if (mounted) setProfile(p);
         } else {
-          if (mounted) setProfile(null);
+          // Only clear profile on explicit sign out, not on token refresh
+          if (event === 'SIGNED_OUT') {
+            if (mounted) setProfile(null);
+          }
         }
-        if (mounted) setLoading(false);
+
+        if (mounted) {
+          setLoading(false);
+          initialLoadDone.current = true;
+        }
       }
     );
 
-    // Safety net: stop spinner after 4s even if event never fires
+    // Safety net: stop spinner after 4s
     const safetyTimer = setTimeout(() => {
-      if (mounted) setLoading(false);
+      if (mounted) {
+        setLoading(false);
+        initialLoadDone.current = true;
+      }
     }, 4000);
 
     return () => {
