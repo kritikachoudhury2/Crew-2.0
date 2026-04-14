@@ -69,35 +69,34 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    let mounted = true;
+  let mounted = true;
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    async (event, session) => {
       if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         const p = await ensureProfile(session.user.id, session.user.email);
         if (mounted) setProfile(p);
-      }
-      if (mounted) setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
-      if (!mounted) return;
-      if (event === 'INITIAL_SESSION') return;
-      setSession(newSession);
-      setUser(newSession?.user ?? null);
-      if (newSession?.user) {
-        const p = await ensureProfile(newSession.user.id, newSession.user.email);
-        if (mounted) setProfile(p);
       } else {
         if (mounted) setProfile(null);
       }
       if (mounted) setLoading(false);
-    });
+    }
+  );
 
-    return () => { mounted = false; subscription.unsubscribe(); };
-  }, []);
+  // Safety net — if onAuthStateChange never fires, stop the spinner after 3s
+  const safetyTimer = setTimeout(() => {
+    if (mounted) setLoading(false);
+  }, 3000);
+
+  return () => {
+    mounted = false;
+    clearTimeout(safetyTimer);
+    subscription.unsubscribe();
+  };
+}, []);
 
   return (
     <AuthContext.Provider value={{ session, user, profile, loading, refreshProfile, signOut }}>
