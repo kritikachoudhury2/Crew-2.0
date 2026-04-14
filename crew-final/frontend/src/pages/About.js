@@ -15,21 +15,13 @@ export default function About() {
           </p>
 
           <h2 className="font-inter font-bold text-2xl sm:text-3xl text-white tracking-tight mb-6">Built by GrapeLabs <span style={{ color: '#D4880A' }}>AI</span></h2>
-          <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer" className="inline-flex flex-col leading-none gap-1 mb-8" data-testid="about-grape-logo">
-            <span className="font-inter font-[800] text-2xl tracking-tight text-white" style={{ letterSpacing: '-1px' }}>CREW</span>
-            <span className="font-inter font-normal text-sm" style={{ color: '#6B5FA0' }}>by GrapeLabs <span style={{ color: '#D4880A' }}>AI</span></span>
-          </a>
 
           <p className="font-inter text-base mb-12" style={{ color: 'rgba(255,255,255,0.7)', lineHeight: 1.8 }}>
             GrapeLabs AI automates the repetitive work that slows businesses down: orders, leads, follow-ups, payments, internal workflows. We build AI-powered systems that run in the background so teams can focus on what actually matters. CREW is what we build for fun.
           </p>
 
           <div className="rounded-[20px] p-8 border mb-12" style={{ background: 'rgba(42,26,69,0.60)', borderColor: 'rgba(74,61,143,0.25)' }}>
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider mb-4"
-              style={{ color: '#F0A500', background: 'rgba(240,165,0,0.08)', border: '1px solid rgba(240,165,0,0.25)' }}>
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-brand" /> BUILT WITH AI-POWERED SYSTEMS
-            </span>
-            <h3 className="font-inter font-bold text-xl text-white mb-8">Built using AI-powered systems by GrapeLabs <span style={{ color: '#D4880A' }}>AI</span></h3>
+            <h3 className="font-inter font-bold text-xl text-white mb-8">Built using AI-powered systems</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div>
                 <div className="w-10 h-10 rounded-full flex items-center justify-center mb-3" style={{ background: '#4A3D8F' }}>
