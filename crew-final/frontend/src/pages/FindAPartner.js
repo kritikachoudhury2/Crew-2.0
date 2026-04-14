@@ -23,8 +23,19 @@ const sportBadge = (s) => {
   const map = { hyrox: { bg: '#4A3D8F', label: 'HYROX' }, marathon: { bg: '#D4880A', label: 'MARATHON' } };
   return map[s] || { bg: '#4A3D8F', label: s?.toUpperCase() };
 };
-
 const parseArr = (s) => { try { return typeof s === 'string' ? JSON.parse(s) : s || []; } catch { return []; } };
+
+// All cities including Other for users who typed custom city
+const FILTER_CITIES = ['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa', 'Chennai', 'Kolkata', 'Other'];
+// Updated level labels to match onboarding
+const FILTER_LEVELS = [
+  { val: 'beginner', label: 'Beginner' },
+  { val: 'intermediate', label: 'Intermediate' },
+  { val: 'advanced', label: 'Advanced' },
+  { val: 'pro', label: 'Pro' },
+  { val: 'elite', label: 'Elite' },
+  { val: 'rookie', label: 'Rookie' },
+];
 
 export default function FindAPartner() {
   const { user, profile } = useAuth();
@@ -42,15 +53,15 @@ export default function FindAPartner() {
 
   useEffect(() => {
     const fetchProfiles = async () => {
-      // Use neq(flagged, true) instead of eq(flagged, false) so NULL rows are included
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .select('id,name,age,gender,city,area,lat,lng,sport,level,bio,photo_url,target_race,hyrox_category,hyrox_strong,hyrox_weak,hyrox_5k_time,marathon_pace,marathon_distance,marathon_weekly_km,marathon_goal,training_time,training_days,partner_goal,partner_level_pref,partner_gender_pref,email_verified,last_active,profile_views,flagged')
+        .select('id,name,age,gender,city,area,lat,lng,sport,level,bio,photo_url,target_race,hyrox_category,hyrox_strong,hyrox_weak,hyrox_5k_time,marathon_pace,marathon_distance,marathon_weekly_km,marathon_goal,race_goal,training_days,partner_goal,partner_level_pref,partner_gender_pref,email_verified,last_active,profile_views,flagged')
         .neq('flagged', true)
         .neq('id', user?.id || '')
         .not('name', 'is', null)
         .order('last_active', { ascending: false })
         .limit(100);
+      if (error) console.error('[FindAPartner] fetch error:', error.message);
       const profs = data?.length ? data : SEED_PROFILES;
       setAllProfiles(profs);
       setLoading(false);
@@ -74,7 +85,14 @@ export default function FindAPartner() {
         return filters.sport.some(f => sports.includes(f));
       });
     }
-    if (filters.city.length) filtered = filtered.filter(p => filters.city.includes(p.city));
+    if (filters.city.length) {
+      filtered = filtered.filter(p => {
+        // "Other" in filter matches anyone whose city is not in the standard list
+        const standardCities = ['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa', 'Chennai', 'Kolkata'];
+        if (filters.city.includes('Other') && !standardCities.includes(p.city)) return true;
+        return filters.city.includes(p.city);
+      });
+    }
     if (filters.level.length) filtered = filtered.filter(p => filters.level.includes(p.level));
     if (filters.gender.length) filtered = filtered.filter(p => filters.gender.includes(p.gender));
 
@@ -93,7 +111,6 @@ export default function FindAPartner() {
     if (sort === 'best') scored.sort((a, b) => b.matchScore - a.matchScore);
     else if (sort === 'newest') scored.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     else if (sort === 'active') scored.sort((a, b) => new Date(b.last_active || 0) - new Date(a.last_active || 0));
-
     setResults(scored);
   }, [allProfiles, filters, sort, profile]);
 
@@ -135,13 +152,56 @@ export default function FindAPartner() {
   };
 
   const isRecent = (d) => d && (new Date() - new Date(d)) < 7 * 86400000;
-
-  // Profile completeness for current user
   const profileComplete = profile?.name && profile?.city && profile?.sport && profile?.level;
+
+  const FilterPanel = () => (
+    <div className="space-y-5">
+      <div>
+        <p className="font-inter text-xs font-medium text-white mb-2">Sport</p>
+        {['hyrox', 'marathon'].map(s => (
+          <label key={s} className="flex items-center gap-2 mb-1.5 cursor-pointer">
+            <input type="checkbox" checked={filters.sport.includes(s)} onChange={() => toggleFilter('sport', s)} className="accent-amber-brand" />
+            <span className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>{s.charAt(0).toUpperCase() + s.slice(1)}</span>
+          </label>
+        ))}
+      </div>
+      <div>
+        <p className="font-inter text-xs font-medium text-white mb-2">City</p>
+        {FILTER_CITIES.map(c => (
+          <label key={c} className="flex items-center gap-2 mb-1.5 cursor-pointer">
+            <input type="checkbox" checked={filters.city.includes(c)} onChange={() => toggleFilter('city', c)} className="accent-amber-brand" />
+            <span className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>{c}</span>
+          </label>
+        ))}
+      </div>
+      <div>
+        <p className="font-inter text-xs font-medium text-white mb-2">Experience Level</p>
+        {FILTER_LEVELS.map(l => (
+          <label key={l.val} className="flex items-center gap-2 mb-1.5 cursor-pointer">
+            <input type="checkbox" checked={filters.level.includes(l.val)} onChange={() => toggleFilter('level', l.val)} className="accent-amber-brand" />
+            <span className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>{l.label}</span>
+          </label>
+        ))}
+      </div>
+      <div>
+        <p className="font-inter text-xs font-medium text-white mb-2">Gender</p>
+        {['Male', 'Female', 'Other', 'Prefer not to say'].map(g => (
+          <label key={g} className="flex items-center gap-2 mb-1.5 cursor-pointer">
+            <input type="checkbox" checked={filters.gender.includes(g)} onChange={() => toggleFilter('gender', g)} className="accent-amber-brand" />
+            <span className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>{g}</span>
+          </label>
+        ))}
+      </div>
+      {activeCount > 0 && (
+        <button onClick={clearFilters} className="font-inter text-xs transition-colors hover:text-amber-brand" style={{ color: '#6B5FA0' }}>
+          Clear all filters
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div data-testid="find-a-partner-page">
-      {/* Profile completeness banner */}
       {!profileComplete && profile && (
         <div className="px-6 md:px-12 py-3" style={{ background: 'rgba(212,136,10,0.12)', borderBottom: '1px solid rgba(212,136,10,0.25)' }}>
           <p className="font-inter text-sm text-center" style={{ color: '#F0A830' }}>
@@ -153,59 +213,17 @@ export default function FindAPartner() {
       <section className="py-14 md:py-24 px-6 md:px-12 min-h-screen" style={{ background: '#1C0A30' }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row gap-8">
-            {/* Filters Desktop */}
-            <div className="hidden md:block w-72 shrink-0">
+            {/* Desktop Filters */}
+            <div className="hidden md:block w-64 shrink-0">
               <div className="sticky top-20 rounded-[20px] p-5 border" style={{ background: 'rgba(42,26,69,0.60)', borderColor: 'rgba(74,61,143,0.30)' }}>
                 <h3 className="font-inter font-bold text-sm text-white mb-4">Filter athletes</h3>
-                <div className="space-y-5">
-                  <div>
-                    <p className="font-inter text-xs font-medium text-white mb-2">Sport</p>
-                    {['hyrox', 'marathon'].map(s => (
-                      <label key={s} className="flex items-center gap-2 mb-1.5 cursor-pointer">
-                        <input type="checkbox" checked={filters.sport.includes(s)} onChange={() => toggleFilter('sport', s)} className="accent-amber-brand" data-testid={`filter-sport-${s}`} />
-                        <span className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>{s.charAt(0).toUpperCase() + s.slice(1)}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div>
-                    <p className="font-inter text-xs font-medium text-white mb-2">City</p>
-                    {['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa'].map(c => (
-                      <label key={c} className="flex items-center gap-2 mb-1.5 cursor-pointer">
-                        <input type="checkbox" checked={filters.city.includes(c)} onChange={() => toggleFilter('city', c)} className="accent-amber-brand" data-testid={`filter-city-${c}`} />
-                        <span className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>{c}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div>
-                    <p className="font-inter text-xs font-medium text-white mb-2">Experience Level</p>
-                    {['rookie', 'intermediate', 'advanced', 'elite', 'pro'].map(l => (
-                      <label key={l} className="flex items-center gap-2 mb-1.5 cursor-pointer">
-                        <input type="checkbox" checked={filters.level.includes(l)} onChange={() => toggleFilter('level', l)} className="accent-amber-brand" data-testid={`filter-level-${l}`} />
-                        <span className="font-inter text-xs capitalize" style={{ color: 'rgba(255,255,255,0.7)' }}>{l}</span>
-                      </label>
-                    ))}
-                  </div>
-                  <div>
-                    <p className="font-inter text-xs font-medium text-white mb-2">Gender</p>
-                    {['Male', 'Female', 'Other', 'Prefer not to say'].map(g => (
-                      <label key={g} className="flex items-center gap-2 mb-1.5 cursor-pointer">
-                        <input type="checkbox" checked={filters.gender.includes(g)} onChange={() => toggleFilter('gender', g)} className="accent-amber-brand" data-testid={`filter-gender-${g}`} />
-                        <span className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>{g}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                {activeCount > 0 && (
-                  <button onClick={clearFilters} className="mt-4 font-inter text-xs transition-colors hover:text-amber-brand" style={{ color: '#6B5FA0' }} data-testid="clear-filters">
-                    Clear all filters
-                  </button>
-                )}
+                <FilterPanel />
               </div>
             </div>
 
             {/* Mobile filter toggle */}
             <button onClick={() => setShowFilters(true)} className="md:hidden flex items-center gap-2 px-4 py-2 rounded-pill font-inter text-sm self-start"
-              style={{ border: '2px solid rgba(74,61,143,0.30)', color: '#fff' }} data-testid="mobile-filter-btn">
+              style={{ border: '2px solid rgba(74,61,143,0.30)', color: '#fff' }}>
               <Filter size={14} /> Filters {activeCount > 0 && `(${activeCount})`}
             </button>
 
@@ -217,8 +235,7 @@ export default function FindAPartner() {
                 </p>
                 <select value={sort} onChange={e => setSort(e.target.value)}
                   className="px-3 py-1.5 rounded-[8px] font-inter text-xs outline-none"
-                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)', color: '#fff' }}
-                  data-testid="sort-select">
+                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)', color: '#fff' }}>
                   <option value="best">Best Match</option>
                   <option value="active">Most Active</option>
                   <option value="newest">Newest</option>
@@ -246,19 +263,16 @@ export default function FindAPartner() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {results.map(p => (
                     <div key={p.id} className="rounded-[20px] p-5 border transition-all hover:-translate-y-1"
-                      style={{ background: 'rgba(42,26,69,0.60)', borderColor: 'rgba(74,61,143,0.30)' }}
-                      data-testid={`profile-card-${p.id}`}>
+                      style={{ background: 'rgba(42,26,69,0.60)', borderColor: 'rgba(74,61,143,0.30)' }}>
                       <div className="flex items-start gap-3 mb-3">
-                        {p.photo_url ? (
-                          <img src={p.photo_url} alt={p.name} className="w-12 h-12 rounded-full object-cover" />
-                        ) : (
-                          <GradientAvatar name={p.name} size={48} />
-                        )}
+                        {p.photo_url
+                          ? <img src={p.photo_url} alt={p.name} className="w-12 h-12 rounded-full object-cover" />
+                          : <GradientAvatar name={p.name} size={48} />}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="font-inter font-semibold text-sm text-white truncate">{p.name}</p>
                             {isRecent(p.last_active) && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />}
-                            {p.email_verified && <span className="inline-flex items-center gap-0.5 text-green-400"><CheckCircle size={12} /></span>}
+                            {p.email_verified && <CheckCircle size={12} className="text-green-400 shrink-0" />}
                           </div>
                           <div className="flex flex-wrap gap-1 mt-1">
                             {parseSports(p.sport).filter(s => s !== 'ironman').map(s => {
@@ -284,7 +298,7 @@ export default function FindAPartner() {
                       <div className="mb-2">
                         <div className="flex items-center gap-2 mb-1">
                           <div className="flex-1 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                            <div className="h-full rounded-full" style={{ width: `${p.matchScore}%`, background: '#D4880A', borderRadius: 2 }} />
+                            <div className="h-full rounded-full" style={{ width: `${p.matchScore}%`, background: '#D4880A' }} />
                           </div>
                           <span className="font-inter font-bold text-[13px] min-w-[40px] text-right" style={{ color: '#D4880A' }}>
                             {p.matchScore}%
@@ -306,20 +320,17 @@ export default function FindAPartner() {
                       <div className="flex gap-2">
                         <Link to={`/athlete/${p.id}`}
                           className="flex-1 text-center py-2 rounded-pill font-inter font-semibold text-xs transition-all hover:scale-[1.02]"
-                          style={{ background: '#D4880A', color: '#fff' }} data-testid={`connect-${p.id}`}>
+                          style={{ background: '#D4880A', color: '#fff' }}>
                           Connect <ArrowRight size={12} className="inline ml-1" />
                         </Link>
-                        <button
-                          onClick={() => toggleSave(p.id)}
+                        <button onClick={() => toggleSave(p.id)}
                           className="px-3 py-2 rounded-pill transition-colors"
                           style={{
                             border: '2px solid rgba(74,61,143,0.30)',
                             color: savedIds.has(p.id) ? '#D4880A' : 'rgba(255,255,255,0.5)',
                             background: savedIds.has(p.id) ? 'rgba(212,136,10,0.10)' : 'transparent',
                           }}
-                          data-testid={`save-${p.id}`}
-                          title={savedIds.has(p.id) ? 'Remove from saved' : 'Save profile'}
-                        >
+                          title={savedIds.has(p.id) ? 'Remove from saved' : 'Save profile'}>
                           <Heart size={14} fill={savedIds.has(p.id) ? '#D4880A' : 'none'} />
                         </button>
                       </div>
@@ -339,7 +350,7 @@ export default function FindAPartner() {
                     <>
                       <p className="font-inter text-sm text-white mb-2">No athletes match these filters.</p>
                       <p className="font-inter text-xs mb-4" style={{ color: 'rgba(255,255,255,0.5)' }}>Try widening your search.</p>
-                      <button onClick={clearFilters} className="font-inter text-xs font-semibold" style={{ color: '#D4880A' }} data-testid="adjust-filters">
+                      <button onClick={clearFilters} className="font-inter text-xs font-semibold" style={{ color: '#D4880A' }}>
                         Clear Filters
                       </button>
                     </>
@@ -353,34 +364,17 @@ export default function FindAPartner() {
 
       {/* Mobile Filters Drawer */}
       {showFilters && (
-        <div className="fixed inset-0 z-50 md:hidden" data-testid="mobile-filter-drawer">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowFilters(false)} />
-          <div className="absolute bottom-0 left-0 right-0 rounded-t-[20px] p-6 max-h-[80vh] overflow-y-auto" style={{ background: '#1C0A30' }}>
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowFilters(false)} />
+          <div className="absolute bottom-0 left-0 right-0 rounded-t-[24px] p-6 max-h-[85vh] overflow-y-auto" style={{ background: '#1C0A30' }}>
             <div className="flex items-center justify-between mb-6">
-              <h3 className="font-inter font-bold text-white">Filters</h3>
-              <button onClick={() => setShowFilters(false)}><X size={20} className="text-white" /></button>
+              <h3 className="font-inter font-bold text-white text-lg">Filters</h3>
+              <button onClick={() => setShowFilters(false)}><X size={22} className="text-white" /></button>
             </div>
-            <div className="space-y-5">
-              <div>
-                <p className="font-inter text-xs font-medium text-white mb-2">Sport</p>
-                {['hyrox', 'marathon'].map(s => (
-                  <label key={s} className="flex items-center gap-2 mb-1.5">
-                    <input type="checkbox" checked={filters.sport.includes(s)} onChange={() => toggleFilter('sport', s)} className="accent-amber-brand" />
-                    <span className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>{s.charAt(0).toUpperCase() + s.slice(1)}</span>
-                  </label>
-                ))}
-              </div>
-              <div>
-                <p className="font-inter text-xs font-medium text-white mb-2">City</p>
-                {['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa'].map(c => (
-                  <label key={c} className="flex items-center gap-2 mb-1.5">
-                    <input type="checkbox" checked={filters.city.includes(c)} onChange={() => toggleFilter('city', c)} className="accent-amber-brand" />
-                    <span className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>{c}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <button onClick={() => setShowFilters(false)} className="w-full mt-6 py-3 rounded-pill font-inter font-bold text-sm" style={{ background: '#D4880A', color: '#fff' }}>
+            <FilterPanel />
+            <button onClick={() => setShowFilters(false)}
+              className="w-full mt-8 py-3 rounded-pill font-inter font-bold text-sm"
+              style={{ background: '#D4880A', color: '#fff' }}>
               Apply Filters
             </button>
           </div>
