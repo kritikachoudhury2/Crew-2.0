@@ -1,0 +1,330 @@
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { ArrowRight, Users, Trophy, Zap, ChevronRight, ExternalLink } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { SEED_PROFILES } from '../lib/seedProfiles';
+
+function GradientAvatar({ name, size = 48 }) {
+  const initials = (name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const colors = ['#4A3D8F', '#D4880A', '#6B5FA0', '#0F6E56', '#8B5CF6'];
+  const idx = name ? name.charCodeAt(0) % colors.length : 0;
+  return (
+    <div className="rounded-full flex items-center justify-center font-inter font-bold text-white shrink-0"
+      style={{ width: size, height: size, background: `linear-gradient(135deg, ${colors[idx]}, ${colors[(idx + 1) % colors.length]})` }}>
+      {initials}
+    </div>
+  );
+}
+
+function HeroProfileCard({ name, city, sport, matchPct, delay }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay }}
+      className="rounded-[20px] p-4 backdrop-blur-xl border"
+      style={{ background: 'rgba(42,26,69,0.80)', borderColor: 'rgba(74,61,143,0.30)' }}>
+      <div className="flex items-center gap-3 mb-3">
+        <GradientAvatar name={name} size={44} />
+        <div>
+          <p className="font-inter font-semibold text-sm text-white">{name}</p>
+          <p className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>{city} · {sport}</p>
+        </div>
+      </div>
+      <div className="mb-1.5">
+        <div className="w-full h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }}>
+          <div className="h-full rounded-full" style={{ width: `${matchPct}%`, background: '#4A3D8F' }} />
+        </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="font-inter font-bold text-sm" style={{ color: '#F0A500' }}>{matchPct}% match</span>
+        <span className="font-inter text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>Same city · Similar level</span>
+      </div>
+    </motion.div>
+  );
+}
+
+function Marquee() {
+  const items = [
+    'HYROX Bengaluru 2026', 'TCS World 10K', 'HYROX Delhi 26/27',
+    'Tata Mumbai Marathon', 'Vedanta Delhi Half Marathon', 'HYROX Mumbai 2026',
+  ];
+  return (
+    <div className="overflow-hidden py-6" style={{ borderTop: '1px solid rgba(74,61,143,0.15)', borderBottom: '1px solid rgba(74,61,143,0.15)' }}>
+      <div className="flex animate-marquee whitespace-nowrap">
+        {[...items, ...items].map((item, i) => (
+          <span key={i} className="inline-flex items-center mx-4 px-4 py-2 rounded-pill font-inter font-medium text-xs"
+            style={{ background: 'rgba(212,136,10,0.12)', color: '#F0A830', border: '1px solid rgba(212,136,10,0.25)' }}>
+            {item}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SportCard({ badge, badgeColor, desc, tags, sport, to }) {
+  return (
+    <div className="rounded-[20px] p-6 flex flex-col h-full backdrop-blur-xl border transition-all duration-200 hover:-translate-y-1"
+      style={{ background: 'rgba(42,26,69,0.60)', borderColor: 'rgba(74,61,143,0.30)' }}>
+      <span className="inline-block self-start px-3 py-1 rounded-pill font-inter font-bold text-xs text-white mb-4"
+        style={{ background: badgeColor }}>
+        {badge}
+      </span>
+      <p className="font-inter text-sm mb-4 flex-1" style={{ color: 'rgba(255,255,255,0.75)', lineHeight: 1.6 }}>{desc}</p>
+      <div className="flex flex-wrap gap-2 mb-4">
+        {tags.map(t => (
+          <span key={t} className="px-2.5 py-1 rounded-pill font-inter text-[11px]"
+            style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }}>{t}</span>
+        ))}
+      </div>
+      <Link to={to} className="mt-auto w-full text-center py-2.5 rounded-pill font-inter font-semibold text-sm transition-colors"
+        style={{ border: '2px solid #6B5FA0', color: '#fff' }} data-testid={`sport-card-${sport}-cta`}>
+        Find {badge} Partners
+      </Link>
+    </div>
+  );
+}
+
+export default function Home() {
+  const [events, setEvents] = useState([]);
+  const [profiles, setProfiles] = useState([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const { data: evts } = await supabase
+        .from('events').select('*')
+        .gte('event_date', today).eq('is_active', true)
+        .order('event_date', { ascending: true }).limit(3);
+      if (evts?.length) setEvents(evts);
+
+      const { data: profs } = await supabase
+        .from('profiles').select('id, name, city, sport, level, bio, photo_url, email_verified, last_active')
+        .neq('flagged', true).not('name', 'is', null).limit(6);
+      setProfiles(profs?.length ? profs : SEED_PROFILES.slice(0, 6));
+    };
+    fetchData();
+  }, []);
+
+  const daysUntil = (d) => Math.max(0, Math.ceil((new Date(d) - new Date()) / 86400000));
+  const sportBadge = (s) => {
+    const map = { hyrox: { bg: '#4A3D8F', label: 'HYROX' }, marathon: { bg: '#D4880A', label: 'MARATHON' } };
+    return map[s] || { bg: '#4A3D8F', label: s?.toUpperCase() };
+  };
+  const parseSport = (s) => { try { return typeof s === 'string' ? JSON.parse(s) : s || []; } catch { return [s]; } };
+
+  return (
+    <div data-testid="home-page">
+      {/* HERO */}
+      <section className="py-14 md:py-24 px-6 md:px-12 relative overflow-hidden" style={{ background: '#1C0A30' }}>
+        <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'radial-gradient(circle, #7c6fd4 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 relative z-10">
+          <div className="flex flex-col justify-center">
+            <span className="inline-flex items-center self-start gap-2 px-3.5 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider mb-6"
+              style={{ color: '#F0A500', background: 'rgba(240,165,0,0.08)', border: '1px solid rgba(240,165,0,0.25)' }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-brand" /> ENDURANCE ATHLETE MATCHING
+            </span>
+            <h1 className="font-inter font-[800] text-4xl sm:text-5xl lg:text-[60px] text-white leading-[1.05] mb-6"
+              style={{ letterSpacing: '-2px' }} data-testid="hero-heading">
+              Find your people.<br />Race your best.
+            </h1>
+            <p className="font-inter text-base md:text-lg mb-8 max-w-[480px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.7)' }}>
+              Connect with HYROX and Marathon athletes who train at your level, chase the same race, and show up like you do.
+            </p>
+            <div className="flex flex-wrap gap-3 mb-8">
+              <Link to="/get-started" className="inline-flex items-center gap-2 px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02]"
+                style={{ background: '#D4880A', color: '#fff' }} data-testid="hero-cta-primary">
+                Find My Partner <ArrowRight size={16} />
+              </Link>
+              <Link to="/how-it-works" className="inline-flex items-center gap-2 px-7 py-3 rounded-pill font-inter font-semibold text-sm transition-colors"
+                style={{ border: '2px solid #6B5FA0', color: '#fff' }} data-testid="hero-cta-secondary">
+                See How It Works
+              </Link>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-pill font-inter font-medium text-[13px]"
+                style={{ color: 'rgba(255,255,255,0.8)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                <Users size={14} /> 500+ Athletes matched
+              </span>
+              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-pill font-inter font-medium text-[13px]"
+                style={{ color: 'rgba(255,255,255,0.8)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
+                <Zap size={14} /> 2 Sports
+              </span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-4 lg:pt-8">
+            <HeroProfileCard name="Arjun M." city="Delhi" sport="Hyrox" matchPct={87} delay={0.1} />
+            <HeroProfileCard name="Priya K." city="Mumbai" sport="Marathon" matchPct={74} delay={0.25} />
+            <HeroProfileCard name="Ayesha N." city="Bangalore" sport="Marathon" matchPct={68} delay={0.4} />
+            <div className="text-center mt-2">
+              <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider transition-colors hover:text-amber-brand"
+                style={{ color: '#7C6FD4', background: 'rgba(124,111,212,0.10)', border: '1px solid rgba(124,111,212,0.25)', letterSpacing: '0.08em' }}
+                data-testid="hero-grape-labs-pill">
+                BUILT BY GRAPELABS <span style={{ color: '#D4880A', marginLeft: 2 }}>AI</span> <ExternalLink size={12} />
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Marquee />
+
+      {/* STATS */}
+      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#2A1A45' }}>
+        <div className="max-w-7xl mx-auto flex flex-wrap justify-center gap-4">
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}>
+            <Users size={16} style={{ color: 'rgba(255,255,255,0.85)' }} />
+            <span className="font-inter font-medium text-sm" style={{ color: 'rgba(255,255,255,0.85)' }}>500+ Athletes matched</span>
+          </div>
+          <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}>
+            <Trophy size={16} style={{ color: 'rgba(255,255,255,0.85)' }} />
+            <span className="font-inter font-medium text-sm" style={{ color: 'rgba(255,255,255,0.85)' }}>2 Sports covered</span>
+          </div>
+        </div>
+      </section>
+
+      {/* HOW IT WORKS SUMMARY */}
+      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#1C0A30' }}>
+        <div className="max-w-7xl mx-auto">
+          <span className="block font-inter font-semibold text-xs tracking-[0.2em] uppercase mb-3" style={{ color: '#D4880A' }}>SIMPLE BY DESIGN</span>
+          <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-12">
+            From sign-up to training partner in 3 minutes.
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
+            {[
+              { n: '1', title: 'Build your profile', desc: 'Sport, level, target race, goals. 2 minutes.' },
+              { n: '2', title: 'Browse your matches', desc: 'Scored by proximity, level, sport, and timing.' },
+              { n: '3', title: 'Connect safely', desc: 'Request, accept, WhatsApp. Always private.' },
+            ].map(s => (
+              <div key={s.n} className="flex gap-4">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-inter font-bold text-sm text-white" style={{ background: '#4A3D8F' }}>{s.n}</div>
+                <div>
+                  <p className="font-inter font-semibold text-white mb-1">{s.title}</p>
+                  <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>{s.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <Link to="/get-started" className="inline-flex items-center gap-2 px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02]"
+            style={{ background: '#D4880A', color: '#fff' }} data-testid="how-it-works-cta">
+            Create Your Profile <ArrowRight size={16} />
+          </Link>
+        </div>
+      </section>
+
+      {/* SPORT CARDS */}
+      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#2A1A45' }}>
+        <div className="max-w-7xl mx-auto">
+          <span className="block font-inter font-semibold text-xs tracking-[0.2em] uppercase mb-3" style={{ color: '#D4880A' }}>BUILT FOR EVERY ENDURANCE ATHLETE</span>
+          <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-12">Pick your sport. Find your people.</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+            <SportCard badge="HYROX" badgeColor="#4A3D8F" sport="hyrox"
+              desc="Matched by category (Open/Pro/Doubles), station strengths, target race, and whether you need a doubles partner or just a training crew."
+              tags={['SkiErg', 'Sled Push', 'Wall Balls', 'Open/Pro/Doubles']}
+              to="/find-a-partner?sport=hyrox" />
+            <SportCard badge="MARATHON" badgeColor="#D4880A" sport="marathon"
+              desc="Matched by pace, weekly mileage, target race, and whether you want a long run partner, tempo buddy, or race day pacer."
+              tags={['5K to Ultra', 'Pace matching', 'Goal-based']}
+              to="/find-a-partner?sport=marathon" />
+          </div>
+        </div>
+      </section>
+
+      {/* FEATURED ATHLETES */}
+      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#1C0A30' }}>
+        <div className="max-w-7xl mx-auto">
+          <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-2">Athletes already on CREW</h2>
+          <p className="font-inter text-sm mb-10" style={{ color: 'rgba(255,255,255,0.6)' }}>Real profiles. Real races. Log in to connect.</p>
+          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none">
+            {profiles.map((p) => (
+              <div key={p.id} className="min-w-[260px] rounded-[20px] p-5 border flex flex-col shrink-0 transition-all hover:-translate-y-1"
+                style={{ background: 'rgba(42,26,69,0.80)', borderColor: 'rgba(74,61,143,0.30)' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <GradientAvatar name={p.name} size={44} />
+                  <div>
+                    <p className="font-inter font-semibold text-sm text-white">{p.name}</p>
+                    <p className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{p.city}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {parseSport(p.sport).filter(s => s !== 'ironman').map(s => {
+                    const b = sportBadge(s);
+                    return <span key={s} className="px-2 py-0.5 rounded-pill text-[10px] font-inter font-bold text-white" style={{ background: b.bg }}>{b.label}</span>;
+                  })}
+                </div>
+                {p.bio && <p className="font-inter text-xs mb-3 line-clamp-2" style={{ color: 'rgba(255,255,255,0.6)' }}>{p.bio}</p>}
+                <Link to="/get-started" className="mt-auto font-inter font-semibold text-xs flex items-center gap-1 transition-colors hover:text-amber-brand"
+                  style={{ color: '#D4880A' }} data-testid={`featured-athlete-${p.id}`}>
+                  View Profile <ChevronRight size={14} />
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* UPCOMING EVENTS */}
+      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#2A1A45' }}>
+        <div className="max-w-7xl mx-auto">
+          <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-10">Races worth training for.</h2>
+          {events.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {events.map(ev => {
+                const b = sportBadge(ev.sport);
+                const days = daysUntil(ev.event_date);
+                return (
+                  <div key={ev.id} className="rounded-[20px] p-6 border transition-all hover:-translate-y-1"
+                    style={{ background: 'rgba(28,10,48,0.80)', borderColor: 'rgba(74,61,143,0.30)' }}>
+                    <span className="inline-block px-2.5 py-0.5 rounded-pill text-[10px] font-inter font-bold text-white mb-3" style={{ background: b.bg }}>{b.label}</span>
+                    <h3 className="font-inter font-bold text-lg text-white mb-1">{ev.name}</h3>
+                    <p className="font-inter text-sm mb-2" style={{ color: 'rgba(255,255,255,0.6)' }}>
+                      {new Date(ev.event_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                    <p className="font-inter text-xs mb-3" style={{ color: 'rgba(255,255,255,0.5)' }}>{ev.city}</p>
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-pill text-[11px] font-inter font-medium mb-4"
+                      style={{ background: 'rgba(212,136,10,0.15)', color: '#F0A830' }}>
+                      {days === 0 ? 'Today!' : `${days} days away`}
+                    </span>
+                    <div className="flex gap-2">
+                      <Link to={`/find-a-partner?event=${ev.slug}`} className="flex-1 text-center py-2 rounded-pill font-inter font-semibold text-xs"
+                        style={{ background: '#D4880A', color: '#fff' }} data-testid={`event-cta-${ev.slug}`}>
+                        Find Partners
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.5)' }}>Loading upcoming events...</p>
+          )}
+          <Link to="/events" className="inline-flex items-center gap-2 font-inter font-semibold text-sm transition-colors hover:text-amber-brand"
+            style={{ color: '#D4880A' }} data-testid="see-all-events">
+            See All Events <ArrowRight size={16} />
+          </Link>
+        </div>
+      </section>
+
+      {/* GRAPELABS AI CTA */}
+      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#2A1A45', borderTop: '1px solid rgba(74,61,143,0.20)' }}>
+        <div className="max-w-4xl mx-auto text-center">
+          <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider mb-6"
+            style={{ color: '#F0A500', background: 'rgba(240,165,0,0.08)', border: '1px solid rgba(240,165,0,0.25)' }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-brand" /> POWERED BY GRAPELABS <span style={{ color: '#D4880A', marginLeft: 2 }}>AI</span>
+          </span>
+          <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-4">
+            We build the systems that run your business.
+          </h2>
+          <p className="font-inter text-base mb-8 max-w-xl mx-auto" style={{ color: 'rgba(255,255,255,0.7)', lineHeight: 1.7 }}>
+            GrapeLabs AI automates the day-to-day workflows slowing your team down: orders, leads, follow-ups, payments, and more. CREW is what we build for fun.
+          </p>
+          <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02]"
+            style={{ background: '#D4880A', color: '#fff' }} data-testid="grape-labs-cta">
+            See What We Automate <ArrowRight size={16} />
+          </a>
+        </div>
+      </section>
+    </div>
+  );
+}
