@@ -140,10 +140,19 @@ export default function GetStarted() {
   const upsertProfile = async (data) => {
     const uid = getUserId();
     if (!uid) { toast.error('Session expired. Please sign in again.'); return false; }
-    const serialized = { ...data };
-    ['sport', 'hyrox_strong', 'hyrox_weak'].forEach(key => {
-      if (Array.isArray(serialized[key])) serialized[key] = JSON.stringify(serialized[key]);
+
+    // Only send fields that are actually set — prevents HYROX data from being
+    // overwritten with null when the user proceeds through marathon steps
+    const serialized = {};
+    Object.entries(data).forEach(([key, val]) => {
+      if (val === undefined || val === null || val === '') return;
+      if (key === 'sport' || key === 'hyrox_strong' || key === 'hyrox_weak') {
+        serialized[key] = Array.isArray(val) ? JSON.stringify(val) : val;
+      } else {
+        serialized[key] = val;
+      }
     });
+
     const { error: upsertError } = await supabase.from('profiles')
       .upsert({ id: uid, ...serialized, last_active: new Date().toISOString() }, { onConflict: 'id' });
     if (upsertError) {
@@ -530,7 +539,7 @@ export default function GetStarted() {
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level</label>
                 <ChipSelect
-                  options={['Same as me', 'Challenge me', 'Happy to guide someone', 'No preference']}
+                  options={['Same as me', 'Better - Push me', 'Happy to guide someone', 'No preference']}
                   selected={answers.partner_level_pref} multi={false}
                   onToggle={v => update('partner_level_pref', v)} />
               </div>
@@ -681,7 +690,7 @@ export default function GetStarted() {
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level</label>
                 <ChipSelect
-                  options={['Same as me', 'Challenge me', 'Happy to guide someone', 'No preference']}
+                  options={['Same as me', 'Better - Push me', 'Happy to guide someone', 'No preference']}
                   selected={answers.partner_level_pref} multi={false}
                   onToggle={v => update('partner_level_pref', v)} />
               </div>
