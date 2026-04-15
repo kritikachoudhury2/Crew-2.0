@@ -22,7 +22,7 @@ function GradientAvatar({ name, size = 80 }) {
 function StatCard({ label, val }) {
   if (!val) return null;
   return (
-    <div className="rounded-[12px] p-3 border" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)' }}>
+    <div className="rounded-[12px] p-3 border" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)', flex: '1 1 140px' }}>
       <p className="font-inter text-[10px] uppercase tracking-wider mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</p>
       <p className="font-inter text-sm font-medium text-white capitalize">{val}</p>
     </div>
@@ -228,15 +228,15 @@ export default function AthleteProfile() {
                 <span className="w-2 h-2 rounded-full" style={{ background: '#4A3D8F', display: 'inline-block' }} /> HYROX Details
               </h3>
               {hasHyroxStats && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                <div className="flex flex-wrap gap-3 mb-4">
                   {athlete.hyrox_category && (
-                    <div>
+                    <div className="rounded-[12px] p-3 border" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)', flex: '1 1 140px' }}>
                       <p className="font-inter text-[10px] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Category</p>
                       <span className="px-2 py-0.5 rounded-pill text-[10px] font-inter font-bold text-white" style={{ background: '#4A3D8F' }}>{athlete.hyrox_category.toUpperCase()}</span>
                     </div>
                   )}
                   {athlete.hyrox_5k_time && (
-                    <div>
+                    <div className="rounded-[12px] p-3 border" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)', flex: '1 1 140px' }}>
                       <p className="font-inter text-[10px] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>5K Time</p>
                       <p className="font-inter text-sm text-white">{athlete.hyrox_5k_time}</p>
                     </div>
@@ -248,7 +248,7 @@ export default function AthleteProfile() {
                 </div>
               )}
               {hasHyroxPartner && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <div className="flex flex-wrap gap-3 mb-4">
                   <StatCard label="Partner Looking For" val={hyroxVal('hyrox_partner_goal', 'partner_goal')} />
                   <StatCard label="Preferred Partner Level" val={hyroxVal('hyrox_partner_level_pref', 'partner_level_pref')} />
                   <StatCard label="Gender Preference" val={hyroxVal('hyrox_partner_gender_pref', 'partner_gender_pref')} />
@@ -284,7 +284,7 @@ export default function AthleteProfile() {
                 <span className="w-2 h-2 rounded-full" style={{ background: '#D4880A', display: 'inline-block' }} /> Marathon Details
               </h3>
               {hasMarathonStats && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                <div className="flex flex-wrap gap-3 mb-4">
                   {athlete.marathon_distance && <StatCard label="Distance" val={athlete.marathon_distance} />}
                   {athlete.marathon_pace && <StatCard label="Easy Pace" val={`${athlete.marathon_pace}/km`} />}
                   {athlete.marathon_weekly_km && <StatCard label="Weekly KM" val={athlete.marathon_weekly_km} />}
@@ -295,7 +295,7 @@ export default function AthleteProfile() {
                 </div>
               )}
               {hasMarathonPartner && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="flex flex-wrap gap-3">
                   <StatCard label="Partner Looking For" val={marathonVal('marathon_partner_goal', 'partner_goal')} />
                   <StatCard label="Preferred Partner Level" val={marathonVal('marathon_partner_level_pref', 'partner_level_pref')} />
                   <StatCard label="Gender Preference" val={marathonVal('marathon_partner_gender_pref', 'partner_gender_pref')} />
