@@ -13,7 +13,11 @@ export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '', {
     persistSession: true,
     autoRefreshToken: true,
     flowType: 'implicit',
+    // Explicit storage key prevents lock conflicts when multiple Supabase
+    // instances (e.g. PostHog, other scripts) share the same localStorage namespace
+    storageKey: 'crew-supabase-auth',
   },
 });
 
 export default supabase;
+
