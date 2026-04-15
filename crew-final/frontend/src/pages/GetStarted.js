@@ -84,7 +84,6 @@ export default function GetStarted() {
   const [error, setError] = useState('');
   const [events, setEvents] = useState([]);
 
-  // Multi-sport fix: takes the sports array as argument instead of reading stale state
   const getStepSequence = useCallback((sports) => {
     const seq = ['sport-select'];
     if (sports.includes('hyrox')) seq.push('hyrox-race', 'hyrox-fitness', 'hyrox-stations');
@@ -113,7 +112,6 @@ export default function GetStarted() {
       const { data: evts } = await supabase.from('events').select('*')
         .gte('event_date', today).eq('is_active', true).order('event_date');
       setEvents(evts || []);
-
       if (user) {
         const { data: prof } = await supabase.from('profiles').select('name').eq('id', user.id).single();
         if (prof?.name?.trim()) { navigate('/find-a-partner'); return; }
@@ -141,8 +139,6 @@ export default function GetStarted() {
     const uid = getUserId();
     if (!uid) { toast.error('Session expired. Please sign in again.'); return false; }
 
-    // Only send fields that are actually set — prevents HYROX data from being
-    // overwritten with null when the user proceeds through marathon steps
     const serialized = {};
     Object.entries(data).forEach(([key, val]) => {
       if (val === undefined || val === null || val === '') return;
@@ -173,13 +169,10 @@ export default function GetStarted() {
     setSubmitting(true);
     const merged = { ...answers, ...stepData };
     setAnswers(merged);
-
     if (user || session) {
       const ok = await upsertProfile(merged);
       if (!ok) { setSubmitting(false); return; }
     }
-
-    // Use updated sports from merged to compute correct sequence
     const updatedSports = Array.isArray(merged.sport) ? merged.sport :
       (typeof merged.sport === 'string' ? (() => { try { return JSON.parse(merged.sport); } catch { return [merged.sport]; } })() : []);
     const seq = getStepSequence(updatedSports);
@@ -217,9 +210,7 @@ export default function GetStarted() {
   const handleFinalSave = async () => {
     const uid = getUserId();
     if (!uid) return false;
-
     const cityValue = answers.city === 'Other' ? (answers.city_custom || 'Other') : answers.city;
-
     const finalData = {
       id: uid,
       name: answers.name,
@@ -230,29 +221,46 @@ export default function GetStarted() {
       lat: answers.lat || null,
       lng: answers.lng || null,
       sport: Array.isArray(answers.sport) ? JSON.stringify(answers.sport) : answers.sport,
+      // Generic level — last sport answered wins, but sport-specific ones are preserved below
       level: answers.level || null,
-      race_goal: answers.race_goal || null,
       bio: answers.bio || null,
       photo_url: answers.photo_url || null,
-      target_race: answers.target_race || null,
+      // HYROX-specific fields
+      hyrox_target_race: answers.hyrox_target_race || null,
+      hyrox_level: answers.hyrox_level || null,
+      hyrox_race_goal: answers.hyrox_race_goal || null,
+      hyrox_training_days: answers.hyrox_training_days || null,
+      hyrox_partner_goal: answers.hyrox_partner_goal || null,
+      hyrox_partner_level_pref: answers.hyrox_partner_level_pref || null,
+      hyrox_partner_gender_pref: answers.hyrox_partner_gender_pref || null,
       hyrox_category: answers.hyrox_category || null,
       hyrox_strong: Array.isArray(answers.hyrox_strong) ? JSON.stringify(answers.hyrox_strong) : (answers.hyrox_strong || '[]'),
       hyrox_weak: Array.isArray(answers.hyrox_weak) ? JSON.stringify(answers.hyrox_weak) : (answers.hyrox_weak || '[]'),
       hyrox_5k_time: answers.hyrox_5k_time || null,
+      // Marathon-specific fields
+      marathon_target_race: answers.marathon_target_race || null,
+      marathon_level: answers.marathon_level || null,
+      marathon_race_goal: answers.marathon_goal || null,
+      marathon_training_days: answers.marathon_training_days || null,
+      marathon_partner_goal: answers.marathon_partner_goal || null,
+      marathon_partner_level_pref: answers.marathon_partner_level_pref || null,
+      marathon_partner_gender_pref: answers.marathon_partner_gender_pref || null,
       marathon_distance: answers.marathon_distance || null,
       marathon_pace: answers.marathon_pace || null,
       marathon_weekly_km: answers.marathon_weekly_km || null,
       marathon_goal: answers.marathon_goal || null,
-      training_days: answers.training_days || null,
-      partner_goal: answers.partner_goal || null,
-      partner_level_pref: answers.partner_level_pref || null,
-      partner_gender_pref: answers.partner_gender_pref || null,
+      // Shared fallbacks for single-sport users
+      target_race: answers.hyrox_target_race || answers.marathon_target_race || answers.target_race || null,
+      race_goal: answers.hyrox_race_goal || answers.marathon_goal || answers.race_goal || null,
+      training_days: answers.hyrox_training_days || answers.marathon_training_days || answers.training_days || null,
+      partner_goal: answers.hyrox_partner_goal || answers.marathon_partner_goal || answers.partner_goal || null,
+      partner_level_pref: answers.hyrox_partner_level_pref || answers.marathon_partner_level_pref || answers.partner_level_pref || null,
+      partner_gender_pref: answers.hyrox_partner_gender_pref || answers.marathon_partner_gender_pref || answers.partner_gender_pref || null,
       phone: answers.phone || (phone ? `${countryCode}${phone}` : null),
       instagram: answers.instagram || null,
       flagged: false,
       last_active: new Date().toISOString(),
     };
-
     const { error: saveErr } = await supabase.from('profiles').upsert(finalData, { onConflict: 'id' });
     if (saveErr) {
       console.error('[GetStarted] Final save error:', saveErr.message);
@@ -295,14 +303,11 @@ export default function GetStarted() {
   const renderStep = () => {
     switch (step) {
 
-      // ── AUTH ──────────────────────────────────────────────────────────────
       case 'auth':
         return (
           <div className="max-w-md mx-auto">
             <h2 className="font-inter font-[800] text-3xl text-white mb-2">Let's get you set up.</h2>
-            <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              Create your profile and find your training partners.
-            </p>
+            <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.6)' }}>Create your profile and find your training partners.</p>
             {!emailSent ? (
               <>
                 <div className="space-y-4 mb-6">
@@ -345,15 +350,12 @@ export default function GetStarted() {
                 <h3 className="font-inter font-bold text-xl text-white mb-2">Check your inbox.</h3>
                 <p className="font-inter text-sm mb-1" style={{ color: 'rgba(255,255,255,0.6)' }}>We've sent a sign-in link to</p>
                 <p className="font-inter font-semibold text-white mb-4">{email}</p>
-                <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  Click the link in the email. It brings you straight back here to finish your profile.
-                </p>
+                <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>Click the link in the email. It brings you straight back here to finish your profile.</p>
               </div>
             )}
           </div>
         );
 
-      // ── SPORT SELECT ──────────────────────────────────────────────────────
       case 'sport-select':
         return (
           <div className="max-w-md mx-auto">
@@ -373,10 +375,7 @@ export default function GetStarted() {
               })}
             </div>
             <button
-              onClick={() => {
-                const sports = Array.isArray(answers.sport) ? answers.sport : [];
-                goNext({ sport: sports });
-              }}
+              onClick={() => { const sports = Array.isArray(answers.sport) ? answers.sport : []; goNext({ sport: sports }); }}
               disabled={!Array.isArray(answers.sport) || answers.sport.length === 0 || submitting}
               className="w-full py-3 rounded-full font-inter font-bold text-sm transition-all disabled:opacity-30"
               style={{ background: '#D4880A', color: '#fff' }}>
@@ -385,7 +384,7 @@ export default function GetStarted() {
           </div>
         );
 
-      // ── HYROX 1 of 3 ──────────────────────────────────────────────────────
+      // ── HYROX 1 of 3 ─────────────────────────────────────────────────────
       case 'hyrox-race':
         return (
           <div className="max-w-md mx-auto">
@@ -394,7 +393,8 @@ export default function GetStarted() {
             <div className="space-y-6">
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Which race are you targeting?</label>
-                <select value={answers.target_race || ''} onChange={e => update('target_race', e.target.value)}
+                <select value={answers.hyrox_target_race || ''}
+                  onChange={e => { update('hyrox_target_race', e.target.value); update('target_race', e.target.value); }}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
                   <option value="">Not sure yet</option>
@@ -427,6 +427,7 @@ export default function GetStarted() {
                   onToggle={v => {
                     update('_hyrox_exp', v);
                     const map = { '0 — this is my first': 'rookie', '1–2': 'intermediate', '3–5': 'advanced', '5+': 'elite' };
+                    update('hyrox_level', map[v]);
                     update('level', map[v]);
                   }} />
               </div>
@@ -435,7 +436,7 @@ export default function GetStarted() {
           </div>
         );
 
-      // ── HYROX 2 of 3 ──────────────────────────────────────────────────────
+      // ── HYROX 2 of 3 ─────────────────────────────────────────────────────
       case 'hyrox-fitness':
         return (
           <div className="max-w-md mx-auto">
@@ -452,8 +453,8 @@ export default function GetStarted() {
                     { val: 'pro', label: 'Pro', desc: 'Podium ambitions' },
                   ].map(l => (
                     <RadioCard key={l.val} label={l.label} desc={l.desc}
-                      selected={answers.level === l.val}
-                      onClick={() => update('level', l.val)} />
+                      selected={answers.hyrox_level === l.val}
+                      onClick={() => { update('hyrox_level', l.val); update('level', l.val); }} />
                   ))}
                 </div>
               </div>
@@ -465,9 +466,9 @@ export default function GetStarted() {
                     { val: 'Competing for time', label: 'Competing for time', desc: 'Working towards a specific finish time' },
                     { val: 'Podium level', label: 'Podium level', desc: 'Top finisher, age group or overall' },
                   ].map(g => (
-                    <RadioCard key={g.val} label={g.label} desc={g.desc}
-                      selected={answers.race_goal === g.val}
-                      onClick={() => update('race_goal', g.val)} />
+                    <RadioCard key={g.val} label={g.val} desc={g.desc}
+                      selected={answers.hyrox_race_goal === g.val}
+                      onClick={() => { update('hyrox_race_goal', g.val); update('race_goal', g.val); }} />
                   ))}
                 </div>
               </div>
@@ -483,8 +484,8 @@ export default function GetStarted() {
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Training days per week</label>
                 <ChipSelect options={['1–2 days', '3–4 days', '5–6 days', 'Every day']}
-                  selected={answers.training_days} multi={false}
-                  onToggle={v => update('training_days', v)} />
+                  selected={answers.hyrox_training_days} multi={false}
+                  onToggle={v => { update('hyrox_training_days', v); update('training_days', v); }} />
               </div>
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">
@@ -500,7 +501,7 @@ export default function GetStarted() {
           </div>
         );
 
-      // ── HYROX 3 of 3 ──────────────────────────────────────────────────────
+      // ── HYROX 3 of 3 ─────────────────────────────────────────────────────
       case 'hyrox-stations':
         return (
           <div className="max-w-md mx-auto">
@@ -532,8 +533,8 @@ export default function GetStarted() {
                     { val: 'Just connect', label: 'Just connect', desc: 'No specific plan' },
                   ].map(g => (
                     <RadioCard key={g.val} label={g.label} desc={g.desc}
-                      selected={answers.partner_goal === g.val}
-                      onClick={() => update('partner_goal', g.val)} />
+                      selected={answers.hyrox_partner_goal === g.val}
+                      onClick={() => { update('hyrox_partner_goal', g.val); update('partner_goal', g.val); }} />
                   ))}
                 </div>
               </div>
@@ -541,14 +542,14 @@ export default function GetStarted() {
                 <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level</label>
                 <ChipSelect
                   options={['Same as me', 'Better - Challenge me', 'Happy to guide someone', 'No preference']}
-                  selected={answers.partner_level_pref} multi={false}
-                  onToggle={v => update('partner_level_pref', v)} />
+                  selected={answers.hyrox_partner_level_pref} multi={false}
+                  onToggle={v => { update('hyrox_partner_level_pref', v); update('partner_level_pref', v); }} />
               </div>
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Do you have a gender preference?</label>
                 <ChipSelect options={['No preference', 'Men only', 'Women only', 'Other']}
-                  selected={answers.partner_gender_pref} multi={false}
-                  onToggle={v => update('partner_gender_pref', v)} />
+                  selected={answers.hyrox_partner_gender_pref} multi={false}
+                  onToggle={v => { update('hyrox_partner_gender_pref', v); update('partner_gender_pref', v); }} />
               </div>
             </div>
             <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
@@ -575,7 +576,8 @@ export default function GetStarted() {
                 <label className="font-inter text-xs font-medium text-white block mb-2">
                   Target race <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
                 </label>
-                <select value={answers.target_race || ''} onChange={e => update('target_race', e.target.value)}
+                <select value={answers.marathon_target_race || ''}
+                  onChange={e => { update('marathon_target_race', e.target.value); if (!answers.hyrox_target_race) update('target_race', e.target.value); }}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
                   <option value="">Not targeting one yet</option>
@@ -593,7 +595,8 @@ export default function GetStarted() {
                   onToggle={v => {
                     update('_marathon_exp', v);
                     const map = { '0 — first time': 'rookie', '1–3': 'intermediate', '4–10': 'advanced', '10+': 'elite' };
-                    update('level', map[v]);
+                    update('marathon_level', map[v]);
+                    if (!answers.hyrox_level) update('level', map[v]);
                   }} />
               </div>
             </div>
@@ -618,8 +621,8 @@ export default function GetStarted() {
                     { val: 'pro', label: 'Pro', desc: 'Competitive, podium ambitions' },
                   ].map(l => (
                     <RadioCard key={l.val} label={l.label} desc={l.desc}
-                      selected={answers.level === l.val}
-                      onClick={() => update('level', l.val)} />
+                      selected={answers.marathon_level === l.val}
+                      onClick={() => { update('marathon_level', l.val); if (!answers.hyrox_level) update('level', l.val); }} />
                   ))}
                 </div>
               </div>
@@ -642,8 +645,8 @@ export default function GetStarted() {
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Training days per week</label>
                 <ChipSelect options={['2–3 days', '4–5 days', '6–7 days']}
-                  selected={answers.training_days} multi={false}
-                  onToggle={v => update('training_days', v)} />
+                  selected={answers.marathon_training_days} multi={false}
+                  onToggle={v => { update('marathon_training_days', v); if (!answers.hyrox_training_days) update('training_days', v); }} />
               </div>
             </div>
             <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
@@ -683,8 +686,8 @@ export default function GetStarted() {
                     { val: 'Just connect', label: 'Just connect', desc: 'No specific plan' },
                   ].map(g => (
                     <RadioCard key={g.val} label={g.label} desc={g.desc}
-                      selected={answers.partner_goal === g.val}
-                      onClick={() => update('partner_goal', g.val)} />
+                      selected={answers.marathon_partner_goal === g.val}
+                      onClick={() => { update('marathon_partner_goal', g.val); if (!answers.hyrox_partner_goal) update('partner_goal', g.val); }} />
                   ))}
                 </div>
               </div>
@@ -692,14 +695,14 @@ export default function GetStarted() {
                 <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level</label>
                 <ChipSelect
                   options={['Same as me', 'Better - Challenge me', 'Happy to guide someone', 'No preference']}
-                  selected={answers.partner_level_pref} multi={false}
-                  onToggle={v => update('partner_level_pref', v)} />
+                  selected={answers.marathon_partner_level_pref} multi={false}
+                  onToggle={v => { update('marathon_partner_level_pref', v); if (!answers.hyrox_partner_level_pref) update('partner_level_pref', v); }} />
               </div>
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Do you have a gender preference?</label>
                 <ChipSelect options={['No preference', 'Men only', 'Women only', 'Other']}
-                  selected={answers.partner_gender_pref} multi={false}
-                  onToggle={v => update('partner_gender_pref', v)} />
+                  selected={answers.marathon_partner_gender_pref} multi={false}
+                  onToggle={v => { update('marathon_partner_gender_pref', v); if (!answers.hyrox_partner_gender_pref) update('partner_gender_pref', v); }} />
               </div>
             </div>
             <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
@@ -714,27 +717,21 @@ export default function GetStarted() {
             <p className="font-inter text-sm mb-6" style={{ color: 'rgba(255,255,255,0.6)' }}>Tell us a bit about you.</p>
             <div className="space-y-5">
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-1.5">
-                  First name <span style={{ color: '#D4880A' }}>*</span>
-                </label>
+                <label className="font-inter text-xs font-medium text-white block mb-1.5">First name <span style={{ color: '#D4880A' }}>*</span></label>
                 <input type="text" value={answers.name || ''} onChange={e => update('name', e.target.value)}
                   placeholder="e.g. Arjun"
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-1.5">
-                  Age <span style={{ color: '#D4880A' }}>*</span>
-                </label>
+                <label className="font-inter text-xs font-medium text-white block mb-1.5">Age <span style={{ color: '#D4880A' }}>*</span></label>
                 <input type="number" min={16} max={80} value={answers.age || ''} onChange={e => update('age', e.target.value)}
                   placeholder="28"
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">
-                  Gender <span style={{ color: '#D4880A' }}>*</span>
-                </label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Gender <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['Male', 'Female', 'Other', 'Prefer not to say']}
                   selected={answers.gender} multi={false}
                   onToggle={v => update('gender', v)} />
@@ -784,9 +781,7 @@ export default function GetStarted() {
         return (
           <div className="max-w-md mx-auto">
             <h2 className="font-inter font-[800] text-3xl text-white mb-2">Where are you based?</h2>
-            <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              Your city is the biggest factor in finding partners you can actually train with.
-            </p>
+            <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.6)' }}>Your city is the biggest factor in finding partners you can actually train with.</p>
             <div className="space-y-5">
               <button
                 onClick={() => {
@@ -795,19 +790,15 @@ export default function GetStarted() {
                     () => toast.error('Could not get location. Please select manually.')
                   );
                 }}
-                className="w-full py-3 rounded-full font-inter font-semibold text-sm flex items-center justify-center gap-2 transition-all"
+                className="w-full py-3 rounded-full font-inter font-semibold text-sm flex items-center justify-center gap-2"
                 style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
                 <MapPin size={16} /> Use my current location
               </button>
               {answers.lat && (
-                <p className="font-inter text-xs text-center" style={{ color: '#4ade80' }}>
-                  Location detected. Select your city below to confirm.
-                </p>
+                <p className="font-inter text-xs text-center" style={{ color: '#4ade80' }}>Location detected. Select your city below to confirm.</p>
               )}
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-1.5">
-                  City <span style={{ color: '#D4880A' }}>*</span>
-                </label>
+                <label className="font-inter text-xs font-medium text-white block mb-1.5">City <span style={{ color: '#D4880A' }}>*</span></label>
                 <select value={answers.city || ''} onChange={e => update('city', e.target.value)}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
@@ -815,12 +806,9 @@ export default function GetStarted() {
                   {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              {/* Show text input when Other is selected */}
               {answers.city === 'Other' && (
                 <div>
-                  <label className="font-inter text-xs font-medium text-white block mb-1.5">
-                    Enter your city <span style={{ color: '#D4880A' }}>*</span>
-                  </label>
+                  <label className="font-inter text-xs font-medium text-white block mb-1.5">Enter your city <span style={{ color: '#D4880A' }}>*</span></label>
                   <input type="text" value={answers.city_custom || ''} onChange={e => update('city_custom', e.target.value)}
                     placeholder="e.g. Chandigarh"
                     className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
@@ -861,7 +849,6 @@ export default function GetStarted() {
           </div>
         );
 
-      // ── DONE ──────────────────────────────────────────────────────────────
       case 'done':
         return (
           <div className="max-w-md mx-auto text-center">
@@ -871,9 +858,7 @@ export default function GetStarted() {
               </div>
             </motion.div>
             <h2 className="font-inter font-[800] text-3xl text-white mb-2">You're on CREW.</h2>
-            <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.6)' }}>
-              Your profile is live. Time to find your training partner.
-            </p>
+            <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.6)' }}>Your profile is live. Time to find your training partner.</p>
             <div className="flex flex-col gap-3">
               <button onClick={() => navigate('/find-a-partner')}
                 className="w-full py-3 rounded-full font-inter font-bold text-sm transition-all hover:scale-[1.02]"
@@ -887,7 +872,7 @@ export default function GetStarted() {
                   navigator.clipboard.writeText(`${window.location.origin}/athlete/${uid}`)
                     .then(() => toast.success('Profile link copied!'));
                 }}
-                className="w-full py-3 rounded-full font-inter font-semibold text-sm transition-all"
+                className="w-full py-3 rounded-full font-inter font-semibold text-sm"
                 style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
                 Share My Profile
               </button>
@@ -905,12 +890,9 @@ export default function GetStarted() {
         <div className="px-6 pt-6">
           <div className="max-w-md mx-auto">
             <div className="w-full h-1.5 rounded-full mb-2" style={{ background: 'rgba(255,255,255,0.08)' }}>
-              <div className="h-full rounded-full transition-all duration-300"
-                style={{ width: `${progress}%`, background: '#D4880A' }} />
+              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progress}%`, background: '#D4880A' }} />
             </div>
-            <p className="font-inter text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
-              Step {currentIdx + 1} of {totalSteps}
-            </p>
+            <p className="font-inter text-[11px]" style={{ color: 'rgba(255,255,255,0.4)' }}>Step {currentIdx + 1} of {totalSteps}</p>
           </div>
         </div>
       )}
