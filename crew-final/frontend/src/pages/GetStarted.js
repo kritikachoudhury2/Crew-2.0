@@ -146,6 +146,7 @@ export default function GetStarted() {
     const serialized = {};
     Object.entries(data).forEach(([key, val]) => {
       if (val === undefined || val === null || val === '') return;
+      if (Array.isArray(val) && val.length === 0) return;
       if (key === 'sport' || key === 'hyrox_strong' || key === 'hyrox_weak') {
         serialized[key] = Array.isArray(val) ? JSON.stringify(val) : val;
       } else {
@@ -539,7 +540,7 @@ export default function GetStarted() {
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level</label>
                 <ChipSelect
-                  options={['Same as me', 'Better - Push me', 'Happy to guide someone', 'No preference']}
+                  options={['Same as me', 'Better - Challenge me', 'Happy to guide someone', 'No preference']}
                   selected={answers.partner_level_pref} multi={false}
                   onToggle={v => update('partner_level_pref', v)} />
               </div>
@@ -690,7 +691,7 @@ export default function GetStarted() {
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level</label>
                 <ChipSelect
-                  options={['Same as me', 'Better - Push me', 'Happy to guide someone', 'No preference']}
+                  options={['Same as me', 'Better - Challenge me', 'Happy to guide someone', 'No preference']}
                   selected={answers.partner_level_pref} multi={false}
                   onToggle={v => update('partner_level_pref', v)} />
               </div>
