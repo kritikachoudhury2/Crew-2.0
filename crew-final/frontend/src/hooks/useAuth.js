@@ -43,6 +43,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Track whether we've loaded the initial session — prevents resetting on TOKEN_REFRESHED
   const initialLoadDone = useRef(false);
 
   const refreshProfile = useCallback(async () => {
@@ -61,18 +62,43 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true;
 
+    // Immediately hydrate from existing session — this is synchronous with localStorage
+    // and does NOT acquire a Supabase lock, so it won't conflict with PostHog/rrweb
+    supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
+      if (!mounted) return;
+      if (existingSession?.user) {
+        setSession(existingSession);
+        setUser(existingSession.user);
+        const p = await ensureProfile(existingSession.user.id, existingSession.user.email);
+        if (mounted) setProfile(p);
+      }
+      if (mounted) {
+        setLoading(false);
+        initialLoadDone.current = true;
+      }
+    }).catch(() => {
+      // Lock conflict on getSession — fall back, let onAuthStateChange handle it
+      if (mounted) {
+        setTimeout(() => {
+          if (mounted) { setLoading(false); initialLoadDone.current = true; }
+        }, 500);
+      }
+    });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         if (!mounted) return;
 
-        // After first load, TOKEN_REFRESHED and INITIAL_SESSION must never
-        // trigger loading state changes or remount children — update session silently
+        // After first load, these events must NEVER reset loading or re-fetch profile
+        // TOKEN_REFRESHED and INITIAL_SESSION both fire repeatedly and steal the lock
         if (initialLoadDone.current && (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
+          // Silently update session reference only — no profile fetch, no loading change
           setSession(newSession);
           setUser(newSession?.user ?? null);
           return;
         }
 
+        // SIGNED_IN fires when user clicks magic link — this is a real new session
         setSession(newSession);
         setUser(newSession?.user ?? null);
 
@@ -85,19 +111,20 @@ export function AuthProvider({ children }) {
           }
         }
 
-        if (mounted) {
+        if (mounted && !initialLoadDone.current) {
           setLoading(false);
           initialLoadDone.current = true;
         }
       }
     );
 
+    // Safety net: stop spinner after 3s no matter what
     const safetyTimer = setTimeout(() => {
       if (mounted) {
         setLoading(false);
         initialLoadDone.current = true;
       }
-    }, 4000);
+    }, 3000);
 
     return () => {
       mounted = false;
