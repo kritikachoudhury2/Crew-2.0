@@ -6,34 +6,53 @@ const AuthContext = createContext({
   refreshProfile: async () => {}, signOut: async () => {},
 });
 
-async function ensureProfile(uid, email) {
+// ─── fetchProfile ─────────────────────────────────────────────────────────────
+// Simple read-only. Returns the full profile row if it exists.
+// Safe to call any time — never creates or modifies data.
+async function fetchProfile(uid) {
   if (!uid) return null;
-  const { data: existing, error: fetchErr } = await supabase
-    .from('profiles').select('*').eq('id', uid).single();
-  if (fetchErr && fetchErr.code !== 'PGRST116') {
-    console.error('[useAuth] fetchProfile error:', fetchErr.message);
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', uid)
+    .single();
+  if (error && error.code !== 'PGRST116') {
+    console.error('[useAuth] fetchProfile error:', error.message);
     return null;
   }
+  return data || null;
+}
+
+// ─── ensureProfile ────────────────────────────────────────────────────────────
+// Creates a stub profile row only if one doesn't exist yet.
+// Only called on SIGNED_IN (first magic link click), not on refresh.
+async function ensureProfile(uid, email) {
+  if (!uid) return null;
+
+  const existing = await fetchProfile(uid);
   if (existing) {
-    // Fire-and-forget last_active update — don't await, don't block render
+    // Update last_active fire-and-forget — don't block render
     supabase.from('profiles')
       .update({ last_active: new Date().toISOString() })
       .eq('id', uid)
       .then(() => {});
     return existing;
   }
-  // No profile row yet — create one
+
+  // No row yet — create stub for brand new user
   const { data: created, error: insertErr } = await supabase
     .from('profiles')
     .upsert(
       { id: uid, email: email || null, flagged: false, last_active: new Date().toISOString() },
       { onConflict: 'id' }
     )
-    .select().single();
+    .select()
+    .single();
+
   if (insertErr) {
     if (insertErr.code === '23505') {
-      const { data: retry } = await supabase.from('profiles').select('*').eq('id', uid).single();
-      return retry || null;
+      // Race condition — row appeared between select and insert
+      return await fetchProfile(uid);
     }
     console.error('[useAuth] ensureProfile insert error:', insertErr.message);
     return null;
@@ -47,72 +66,61 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const initialLoadDone = useRef(false);
-  const profileFetchedForUid = useRef(null); // track which UID we last fetched profile for
+  const currentUid = useRef(null);
 
-  // ─── refreshProfile ───────────────────────────────────────────────────────
-  // Always fetches fresh data from DB. Called externally (EditProfile, etc.)
-  const refreshProfile = useCallback(async (uid) => {
-    const targetUid = uid || profileFetchedForUid.current;
-    if (!targetUid) return;
-    const { data } = await supabase.from('profiles').select('*').eq('id', targetUid).single();
-    if (data) {
-      setProfile(data);
-      profileFetchedForUid.current = targetUid;
-    }
+  // ─── refreshProfile ──────────────────────────────────────────────────────────
+  // Public — re-reads profile from DB. Called by EditProfile after saving.
+  const refreshProfile = useCallback(async () => {
+    const uid = currentUid.current;
+    if (!uid) return;
+    const data = await fetchProfile(uid);
+    if (data) setProfile(data);
   }, []);
 
-  // ─── signOut ──────────────────────────────────────────────────────────────
+  // ─── signOut ──────────────────────────────────────────────────────────────────
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setSession(null);
     setUser(null);
     setProfile(null);
-    profileFetchedForUid.current = null;
+    currentUid.current = null;
     window.location.href = '/';
   }, []);
 
-  // ─── Tab visibility handler ───────────────────────────────────────────────
-  // When user returns to tab, silently refresh the profile if we have a session.
-  // This fixes the "profile disappears after tab switch" bug without triggering
-  // a loading state or re-mounting children.
+  // ─── Tab visibility — re-fetch profile when user returns to tab ───────────────
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState !== 'visible') return;
-      if (!profileFetchedForUid.current) return;
-
-      // Silently re-fetch profile to ensure data is fresh
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', profileFetchedForUid.current)
-        .single();
+      if (!currentUid.current) return;
+      const data = await fetchProfile(currentUid.current);
       if (data) setProfile(data);
     };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
-  // ─── Main auth effect ─────────────────────────────────────────────────────
+  // ─── Main auth effect ─────────────────────────────────────────────────────────
   useEffect(() => {
     let mounted = true;
 
-    // Step 1: Immediately hydrate from existing session (uses localStorage, fast)
+    // Step 1: Immediate hydration from localStorage session (no network).
+    // This is the PRIMARY path on every page refresh.
     supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
       if (!mounted) return;
 
       if (existingSession?.user) {
+        const uid = existingSession.user.id;
         setSession(existingSession);
         setUser(existingSession.user);
+        currentUid.current = uid;
 
-        // Only fetch profile if we haven't already for this UID
-        if (profileFetchedForUid.current !== existingSession.user.id) {
-          const p = await ensureProfile(existingSession.user.id, existingSession.user.email);
-          if (mounted) {
-            setProfile(p);
-            profileFetchedForUid.current = existingSession.user.id;
-          }
-        }
+        // KEY FIX: use fetchProfile (read-only) on refresh.
+        // The profile row already has full data — we just need to read it.
+        // Do NOT use ensureProfile here because it could return a stub row
+        // before the full onboarding data has been written, and we'd cache
+        // that stub in state.
+        const p = await fetchProfile(uid);
+        if (mounted) setProfile(p);
       }
 
       if (mounted) {
@@ -120,8 +128,7 @@ export function AuthProvider({ children }) {
         initialLoadDone.current = true;
       }
     }).catch((err) => {
-      console.warn('[useAuth] getSession error (lock conflict?):', err?.message);
-      // Don't crash — let onAuthStateChange handle it
+      console.warn('[useAuth] getSession error:', err?.message);
       if (mounted) {
         setTimeout(() => {
           if (mounted) {
@@ -132,34 +139,32 @@ export function AuthProvider({ children }) {
       }
     });
 
-    // Step 2: Listen for auth state changes
+    // Step 2: Auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, newSession) => {
         if (!mounted) return;
-        console.log('[useAuth] auth event:', event);
+        console.log('[useAuth] event:', event);
 
         if (event === 'TOKEN_REFRESHED') {
-          // Session token rotated — update session reference but do NOT
-          // re-fetch profile or change loading. Profile data is unchanged.
+          // Token silently rotated. Update session ref only.
+          // Profile data is unchanged — do not re-fetch.
           setSession(newSession);
           setUser(newSession?.user ?? null);
           return;
         }
 
         if (event === 'INITIAL_SESSION') {
-          // Supabase fires this on startup. If initialLoadDone is already true
-          // (getSession succeeded), ignore to avoid double work.
+          // Skip if getSession() already handled startup
           if (initialLoadDone.current) return;
 
           setSession(newSession);
           setUser(newSession?.user ?? null);
 
-          if (newSession?.user && profileFetchedForUid.current !== newSession.user.id) {
-            const p = await ensureProfile(newSession.user.id, newSession.user.email);
-            if (mounted) {
-              setProfile(p);
-              profileFetchedForUid.current = newSession.user.id;
-            }
+          if (newSession?.user) {
+            const uid = newSession.user.id;
+            currentUid.current = uid;
+            const p = await fetchProfile(uid);
+            if (mounted) setProfile(p);
           }
 
           if (mounted) {
@@ -170,16 +175,17 @@ export function AuthProvider({ children }) {
         }
 
         if (event === 'SIGNED_IN') {
-          // Real sign-in (magic link click). Always fetch fresh profile.
+          // Real sign-in via magic link click.
+          // Use ensureProfile because this may be a brand new user
+          // with no profile row yet.
           setSession(newSession);
           setUser(newSession?.user ?? null);
 
           if (newSession?.user) {
-            const p = await ensureProfile(newSession.user.id, newSession.user.email);
-            if (mounted) {
-              setProfile(p);
-              profileFetchedForUid.current = newSession.user.id;
-            }
+            const uid = newSession.user.id;
+            currentUid.current = uid;
+            const p = await ensureProfile(uid, newSession.user.email);
+            if (mounted) setProfile(p);
           }
 
           if (mounted && !initialLoadDone.current) {
@@ -193,7 +199,7 @@ export function AuthProvider({ children }) {
           setSession(null);
           setUser(null);
           setProfile(null);
-          profileFetchedForUid.current = null;
+          currentUid.current = null;
           if (mounted && !initialLoadDone.current) {
             setLoading(false);
             initialLoadDone.current = true;
@@ -201,7 +207,7 @@ export function AuthProvider({ children }) {
           return;
         }
 
-        // Any other event — update session, don't touch profile
+        // Any other event
         setSession(newSession);
         setUser(newSession?.user ?? null);
         if (mounted && !initialLoadDone.current) {
@@ -211,10 +217,10 @@ export function AuthProvider({ children }) {
       }
     );
 
-    // Safety net: 4s hard stop on loading spinner no matter what
+    // Safety net: 4s hard stop on spinner
     const safetyTimer = setTimeout(() => {
       if (mounted && !initialLoadDone.current) {
-        console.warn('[useAuth] safety timer fired — forcing loading=false');
+        console.warn('[useAuth] safety timer fired');
         setLoading(false);
         initialLoadDone.current = true;
       }
