@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { calcMatchScore, whyMatched as getWhyMatched } from '../lib/matching';
 import { SEED_PROFILES } from '../lib/seedProfiles';
-import { ArrowRight, Heart, MoreHorizontal, Eye, CheckCircle, MessageCircle, Flag, Ban, ExternalLink, MapPin, Target, Users } from 'lucide-react';
+import { ArrowRight, Heart, MoreHorizontal, Eye, CheckCircle, MessageCircle, Flag, Ban, ExternalLink, MapPin, Users } from 'lucide-react';
 import { toast } from 'sonner';
 
 function GradientAvatar({ name, size = 80 }) {
@@ -94,8 +94,7 @@ export default function AthleteProfile() {
     });
     if (error) { toast.error('Could not send request. Please try again.'); return; }
     setConnectionState('sent');
-    const remaining = Math.max(0, 9 - count);
-    toast.success(`Connection request sent! ${remaining} requests remaining today.`);
+    toast.success(`Connection request sent! ${Math.max(0, 9 - count)} requests remaining today.`);
   };
 
   const handleToggleSave = async () => {
@@ -133,9 +132,12 @@ export default function AthleteProfile() {
   const matchScore = myProfile ? calcMatchScore(myProfile, athlete) : 0;
   const matchReason = myProfile ? getWhyMatched(myProfile, athlete) : '';
 
+  // Helper: get sport-specific value, falling back to shared field
+  const hyroxVal = (sportField, sharedField) => athlete[sportField] || athlete[sharedField] || null;
+  const marathonVal = (sportField, sharedField) => athlete[sportField] || (sports.includes('hyrox') ? null : athlete[sharedField]) || null;
+
   return (
     <div data-testid="athlete-profile-page" style={{ background: '#1C0A30' }}>
-      {/* Banner */}
       <div className="h-40 relative" style={{ background: 'linear-gradient(135deg, #4A3D8F, #1C0A30)' }}>
         <div className="absolute -bottom-10 left-6 md:left-12">
           {athlete.photo_url
@@ -161,7 +163,6 @@ export default function AthleteProfile() {
 
       <section className="pt-14 pb-24 px-6 md:px-12">
         <div className="max-w-4xl mx-auto">
-          {/* Header */}
           <div className="mb-6">
             <div className="flex items-center gap-2 mb-1">
               <h1 className="font-inter font-bold text-2xl text-white">{athlete.name}</h1>
@@ -188,7 +189,7 @@ export default function AthleteProfile() {
               </span>
               {athlete.instagram && (
                 <a href={`https://instagram.com/${athlete.instagram}`} target="_blank" rel="noopener noreferrer"
-                  className="font-inter text-xs flex items-center gap-1 hover:text-amber-brand" style={{ color: '#6B5FA0' }}>
+                  className="font-inter text-xs flex items-center gap-1" style={{ color: '#6B5FA0' }}>
                   @{athlete.instagram} <ExternalLink size={10} />
                 </a>
               )}
@@ -199,23 +200,13 @@ export default function AthleteProfile() {
             <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.7)', lineHeight: 1.7 }}>{athlete.bio}</p>
           )}
 
-          {/* Core stats grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-8">
-            <StatCard label="Training Days" val={athlete.training_days} />
-            <StatCard label="Target Race" val={athlete.target_race} />
-            <StatCard label="Race Goal" val={athlete.race_goal} />
-            <StatCard label="Partner Looking For" val={athlete.partner_goal} />
-            <StatCard label="Preferred Partner Level" val={athlete.partner_level_pref} />
-            <StatCard label="Gender Preference" val={athlete.partner_gender_pref} />
-          </div>
-
-          {/* HYROX details */}
+          {/* HYROX section */}
           {sports.includes('hyrox') && (
             <div className="rounded-[20px] p-6 border mb-6" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)' }}>
               <h3 className="font-inter font-bold text-sm text-white mb-4 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full" style={{ background: '#4A3D8F', display: 'inline-block' }} /> HYROX Details
               </h3>
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                 {athlete.hyrox_category && (
                   <div>
                     <p className="font-inter text-[10px] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Category</p>
@@ -228,6 +219,15 @@ export default function AthleteProfile() {
                     <p className="font-inter text-sm text-white">{athlete.hyrox_5k_time}</p>
                   </div>
                 )}
+                <StatCard label="Target Race" val={hyroxVal('hyrox_target_race', 'target_race')} />
+                <StatCard label="Race Goal" val={hyroxVal('hyrox_race_goal', 'race_goal')} />
+                <StatCard label="Training Days" val={hyroxVal('hyrox_training_days', 'training_days')} />
+                <StatCard label="Level" val={hyroxVal('hyrox_level', 'level')} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <StatCard label="Partner Looking For" val={hyroxVal('hyrox_partner_goal', 'partner_goal')} />
+                <StatCard label="Preferred Partner Level" val={hyroxVal('hyrox_partner_level_pref', 'partner_level_pref')} />
+                <StatCard label="Gender Preference" val={hyroxVal('hyrox_partner_gender_pref', 'partner_gender_pref')} />
               </div>
               {parseArr(athlete.hyrox_strong).length > 0 && (
                 <div className="mb-3">
@@ -252,18 +252,25 @@ export default function AthleteProfile() {
             </div>
           )}
 
-          {/* Marathon details */}
+          {/* Marathon section */}
           {sports.includes('marathon') && (
             <div className="rounded-[20px] p-6 border mb-6" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)' }}>
               <h3 className="font-inter font-bold text-sm text-white mb-4 flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full" style={{ background: '#D4880A', display: 'inline-block' }} /> Marathon Details
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {athlete.marathon_distance && <div><p className="text-[10px] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Distance</p><p className="font-inter text-sm text-white">{athlete.marathon_distance}</p></div>}
-                {athlete.marathon_pace && <div><p className="text-[10px] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Easy Pace</p><p className="font-inter text-sm text-white">{athlete.marathon_pace}/km</p></div>}
-                {athlete.marathon_weekly_km && <div><p className="text-[10px] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Weekly KM</p><p className="font-inter text-sm text-white">{athlete.marathon_weekly_km}</p></div>}
-                {athlete.marathon_goal && <div><p className="text-[10px] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Race Goal</p><p className="font-inter text-sm text-white">{athlete.marathon_goal}</p></div>}
-                {athlete.training_days && <div><p className="text-[10px] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Training Days</p><p className="font-inter text-sm text-white">{athlete.training_days}</p></div>}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                {athlete.marathon_distance && <StatCard label="Distance" val={athlete.marathon_distance} />}
+                {athlete.marathon_pace && <StatCard label="Easy Pace" val={`${athlete.marathon_pace}/km`} />}
+                {athlete.marathon_weekly_km && <StatCard label="Weekly KM" val={athlete.marathon_weekly_km} />}
+                <StatCard label="Target Race" val={marathonVal('marathon_target_race', 'target_race')} />
+                <StatCard label="Race Goal" val={athlete.marathon_goal || marathonVal('marathon_race_goal', 'race_goal')} />
+                <StatCard label="Training Days" val={marathonVal('marathon_training_days', 'training_days')} />
+                <StatCard label="Level" val={marathonVal('marathon_level', 'level')} />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <StatCard label="Partner Looking For" val={marathonVal('marathon_partner_goal', 'partner_goal')} />
+                <StatCard label="Preferred Partner Level" val={marathonVal('marathon_partner_level_pref', 'partner_level_pref')} />
+                <StatCard label="Gender Preference" val={marathonVal('marathon_partner_gender_pref', 'partner_gender_pref')} />
               </div>
             </div>
           )}
