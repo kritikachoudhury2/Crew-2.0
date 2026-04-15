@@ -52,20 +52,27 @@ function ChipSelect({ options, selected, onToggle, multi = true, maxSelect = nul
   );
 }
 
-function NavButtons({ onBack, onNext, disabled, nextLabel = 'Next', showBack = true }) {
+function NavButtons({ onBack, onNext, disabled, nextLabel = 'Next', showBack = true, errorMsg }) {
   return (
-    <div className="flex gap-3 mt-8">
-      {showBack && (
-        <button onClick={onBack} className="px-6 py-3 rounded-full font-inter font-semibold text-sm"
-          style={{ border: '2px solid rgba(74,61,143,0.30)', color: '#fff' }}>
-          <ArrowLeft size={16} />
+    <div className="mt-8">
+      <div className="flex gap-3">
+        {showBack && (
+          <button onClick={onBack} className="px-6 py-3 rounded-full font-inter font-semibold text-sm"
+            style={{ border: '2px solid rgba(74,61,143,0.30)', color: '#fff' }}>
+            <ArrowLeft size={16} />
+          </button>
+        )}
+        <button onClick={() => onNext()} disabled={disabled}
+          className="flex-1 py-3 rounded-full font-inter font-bold text-sm disabled:opacity-30 transition-all"
+          style={{ background: '#D4880A', color: '#fff' }}>
+          {nextLabel} {!disabled && <ArrowRight size={16} className="inline ml-1" />}
         </button>
+      </div>
+      {errorMsg && (
+        <p className="font-inter text-xs mt-3 text-center" style={{ color: '#ef4444' }}>
+          {errorMsg}
+        </p>
       )}
-      <button onClick={() => onNext()} disabled={disabled}
-        className="flex-1 py-3 rounded-full font-inter font-bold text-sm disabled:opacity-30 transition-all"
-        style={{ background: '#D4880A', color: '#fff' }}>
-        {nextLabel} {!disabled && <ArrowRight size={16} className="inline ml-1" />}
-      </button>
     </div>
   );
 }
@@ -82,6 +89,7 @@ export default function GetStarted() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [validationError, setValidationError] = useState('');
   const [events, setEvents] = useState([]);
 
   const getStepSequence = useCallback((sports) => {
@@ -166,6 +174,7 @@ export default function GetStarted() {
 
   const goNext = async (stepData = {}) => {
     if (submitting) return;
+    setValidationError('');
     setSubmitting(true);
     const merged = { ...answers, ...stepData };
     setAnswers(merged);
@@ -184,9 +193,21 @@ export default function GetStarted() {
   };
 
   const goBack = () => {
+    setValidationError('');
     const seq = getStepSequence(getCurrentSports());
     const idx = seq.indexOf(step);
     if (idx > 0) setStep(seq[idx - 1]);
+  };
+
+  const requireFields = (checks) => {
+    for (const [condition, message] of checks) {
+      if (!condition) {
+        setValidationError(message);
+        return false;
+      }
+    }
+    setValidationError('');
+    return true;
   };
 
   const handleSendMagicLink = async () => {
@@ -392,7 +413,9 @@ export default function GetStarted() {
             <h2 className="font-inter font-[800] text-3xl text-white mb-6">Your race.</h2>
             <div className="space-y-6">
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Which race are you targeting?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">
+                  Which race are you targeting? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
+                </label>
                 <select value={answers.hyrox_target_race || ''}
                   onChange={e => { update('hyrox_target_race', e.target.value); update('target_race', e.target.value); }}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
@@ -405,7 +428,7 @@ export default function GetStarted() {
                 </select>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your category</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your category <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'open', label: 'Open', desc: 'Standard solo — most popular' },
@@ -420,7 +443,7 @@ export default function GetStarted() {
                 </div>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">How many HYROX races have you done before?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">How many HYROX races have you done before? <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect
                   options={['0 — this is my first', '1–2', '3–5', '5+']}
                   selected={answers._hyrox_exp} multi={false}
@@ -432,7 +455,18 @@ export default function GetStarted() {
                   }} />
               </div>
             </div>
-            <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            <NavButtons
+              onBack={goBack}
+              onNext={() => {
+                if (requireFields([
+                  [answers.hyrox_category, 'Please choose your HYROX category'],
+                  [answers._hyrox_exp, 'Please select how many HYROX races you\'ve done'],
+                ])) goNext();
+              }}
+              disabled={submitting}
+              nextLabel={submitting ? 'Saving...' : 'Next'}
+              errorMsg={validationError}
+            />
           </div>
         );
 
@@ -444,7 +478,7 @@ export default function GetStarted() {
             <h2 className="font-inter font-[800] text-3xl text-white mb-6">Your fitness.</h2>
             <div className="space-y-6">
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Select your current fitness level</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Select your current fitness level <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'beginner', label: 'Beginner', desc: 'Building base fitness' },
@@ -459,12 +493,13 @@ export default function GetStarted() {
                 </div>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">What do you want out of the race?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">What do you want out of the race? <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'Participating for fun', label: 'Participating for fun', desc: 'Just here to enjoy it' },
                     { val: 'Competing for time', label: 'Competing for time', desc: 'Working towards a specific finish time' },
                     { val: 'Podium level', label: 'Podium level', desc: 'Top finisher, age group or overall' },
+                    { val: 'Not sure yet', label: 'Not sure yet', desc: 'I\'ll figure it out as I train' },
                   ].map(g => (
                     <RadioCard key={g.val} label={g.val} desc={g.desc}
                       selected={answers.hyrox_race_goal === g.val}
@@ -482,7 +517,7 @@ export default function GetStarted() {
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Training days per week</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Training days per week <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['1–2 days', '3–4 days', '5–6 days', 'Every day']}
                   selected={answers.hyrox_training_days} multi={false}
                   onToggle={v => { update('hyrox_training_days', v); update('training_days', v); }} />
@@ -497,7 +532,19 @@ export default function GetStarted() {
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
               </div>
             </div>
-            <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            <NavButtons
+              onBack={goBack}
+              onNext={() => {
+                if (requireFields([
+                  [answers.hyrox_level, 'Please select your fitness level'],
+                  [answers.hyrox_race_goal, 'Please tell us what you want out of the race'],
+                  [answers.hyrox_training_days, 'Please select how many days per week you train'],
+                ])) goNext();
+              }}
+              disabled={submitting}
+              nextLabel={submitting ? 'Saving...' : 'Next'}
+              errorMsg={validationError}
+            />
           </div>
         );
 
@@ -511,20 +558,20 @@ export default function GetStarted() {
             <div className="space-y-6">
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">
-                  What are your strengths? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>Select up to 3</span>
+                  What are your strengths? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional — select up to 3)</span>
                 </label>
                 <ChipSelect options={HYROX_STATIONS} selected={answers.hyrox_strong || []}
                   onToggle={v => toggleArray('hyrox_strong', v, 3)} maxSelect={3} />
               </div>
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">
-                  Where do you want to improve? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>Select up to 3</span>
+                  Where do you want to improve? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional — select up to 3)</span>
                 </label>
                 <ChipSelect options={HYROX_STATIONS} selected={answers.hyrox_weak || []}
                   onToggle={v => toggleArray('hyrox_weak', v, 3)} maxSelect={3} />
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your ideal training partner</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your ideal training partner <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'Train regularly', label: 'Train together regularly', desc: 'Same programme, consistent sessions' },
@@ -539,20 +586,32 @@ export default function GetStarted() {
                 </div>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect
                   options={['Same as me', 'Better - Challenge me', 'Happy to guide someone', 'No preference']}
                   selected={answers.hyrox_partner_level_pref} multi={false}
                   onToggle={v => { update('hyrox_partner_level_pref', v); update('partner_level_pref', v); }} />
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Do you have a gender preference?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Do you have a gender preference? <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['No preference', 'Men only', 'Women only', 'Other']}
                   selected={answers.hyrox_partner_gender_pref} multi={false}
                   onToggle={v => { update('hyrox_partner_gender_pref', v); update('partner_gender_pref', v); }} />
               </div>
             </div>
-            <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            <NavButtons
+              onBack={goBack}
+              onNext={() => {
+                if (requireFields([
+                  [answers.hyrox_partner_goal, 'Please choose your ideal training partner type'],
+                  [answers.hyrox_partner_level_pref, 'Please choose your preferred partner level'],
+                  [answers.hyrox_partner_gender_pref, 'Please choose your gender preference'],
+                ])) goNext();
+              }}
+              disabled={submitting}
+              nextLabel={submitting ? 'Saving...' : 'Next'}
+              errorMsg={validationError}
+            />
           </div>
         );
 
@@ -564,7 +623,7 @@ export default function GetStarted() {
             <h2 className="font-inter font-[800] text-3xl text-white mb-6">Your race.</h2>
             <div className="space-y-6">
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Distance you're training for</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Distance you're training for <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="grid grid-cols-2 gap-2">
                   {['5K', '10K', 'Half Marathon', 'Full Marathon', 'Ultra'].map(d => (
                     <RadioCard key={d} label={d} selected={answers.marathon_distance === d}
@@ -588,7 +647,7 @@ export default function GetStarted() {
                 </select>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Races completed at this distance</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Races completed at this distance <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect
                   options={['0 — first time', '1–3', '4–10', '10+']}
                   selected={answers._marathon_exp} multi={false}
@@ -600,7 +659,18 @@ export default function GetStarted() {
                   }} />
               </div>
             </div>
-            <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            <NavButtons
+              onBack={goBack}
+              onNext={() => {
+                if (requireFields([
+                  [answers.marathon_distance, 'Please select the distance you\'re training for'],
+                  [answers._marathon_exp, 'Please select how many races you\'ve completed'],
+                ])) goNext();
+              }}
+              disabled={submitting}
+              nextLabel={submitting ? 'Saving...' : 'Next'}
+              errorMsg={validationError}
+            />
           </div>
         );
 
@@ -612,7 +682,7 @@ export default function GetStarted() {
             <h2 className="font-inter font-[800] text-3xl text-white mb-6">Your training.</h2>
             <div className="space-y-6">
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Select your current fitness level</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Select your current fitness level <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'beginner', label: 'Beginner', desc: 'Building base fitness' },
@@ -637,19 +707,31 @@ export default function GetStarted() {
                 <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Your easy pace, not race pace.</p>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">What's your avg weekly distance?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">What's your avg weekly distance? <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['Under 20km', '20–40km', '40–60km', '60–80km', '80km+']}
                   selected={answers.marathon_weekly_km} multi={false}
                   onToggle={v => update('marathon_weekly_km', v)} />
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Training days per week</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Training days per week <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['2–3 days', '4–5 days', '6–7 days']}
                   selected={answers.marathon_training_days} multi={false}
                   onToggle={v => { update('marathon_training_days', v); if (!answers.hyrox_training_days) update('training_days', v); }} />
               </div>
             </div>
-            <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            <NavButtons
+              onBack={goBack}
+              onNext={() => {
+                if (requireFields([
+                  [answers.marathon_level, 'Please select your current fitness level'],
+                  [answers.marathon_weekly_km, 'Please select your average weekly distance'],
+                  [answers.marathon_training_days, 'Please select how many days per week you train'],
+                ])) goNext();
+              }}
+              disabled={submitting}
+              nextLabel={submitting ? 'Saving...' : 'Next'}
+              errorMsg={validationError}
+            />
           </div>
         );
 
@@ -661,13 +743,14 @@ export default function GetStarted() {
             <h2 className="font-inter font-[800] text-3xl text-white mb-6">Your goal and partner.</h2>
             <div className="space-y-6">
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">What do you want out of the race?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">What do you want out of the race? <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'Participating for fun', label: 'Participating for fun', desc: 'First time, getting to the line is the goal' },
                     { val: 'Beat my PB', label: 'Beat my PB', desc: 'I have a time, I want to beat it' },
                     { val: 'Hit a target time', label: 'Hit a target time', desc: 'Working towards a specific finish' },
                     { val: 'Compete and place', label: 'Compete and place', desc: 'Age group or overall placing' },
+                    { val: 'Not sure yet', label: 'Not sure yet', desc: 'I\'ll figure it out as I train' },
                   ].map(g => (
                     <RadioCard key={g.val} label={g.label} desc={g.desc}
                       selected={answers.marathon_goal === g.val}
@@ -676,7 +759,7 @@ export default function GetStarted() {
                 </div>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your ideal training partner</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your ideal training partner <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'Long run partner', label: 'Long run partner', desc: 'Weekend distance together' },
@@ -692,20 +775,33 @@ export default function GetStarted() {
                 </div>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect
                   options={['Same as me', 'Better - Challenge me', 'Happy to guide someone', 'No preference']}
                   selected={answers.marathon_partner_level_pref} multi={false}
                   onToggle={v => { update('marathon_partner_level_pref', v); if (!answers.hyrox_partner_level_pref) update('partner_level_pref', v); }} />
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Do you have a gender preference?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Do you have a gender preference? <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['No preference', 'Men only', 'Women only', 'Other']}
                   selected={answers.marathon_partner_gender_pref} multi={false}
                   onToggle={v => { update('marathon_partner_gender_pref', v); if (!answers.hyrox_partner_gender_pref) update('partner_gender_pref', v); }} />
               </div>
             </div>
-            <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            <NavButtons
+              onBack={goBack}
+              onNext={() => {
+                if (requireFields([
+                  [answers.marathon_goal, 'Please tell us what you want out of the race'],
+                  [answers.marathon_partner_goal, 'Please choose your ideal training partner type'],
+                  [answers.marathon_partner_level_pref, 'Please choose your preferred partner level'],
+                  [answers.marathon_partner_gender_pref, 'Please choose your gender preference'],
+                ])) goNext();
+              }}
+              disabled={submitting}
+              nextLabel={submitting ? 'Saving...' : 'Next'}
+              errorMsg={validationError}
+            />
           </div>
         );
 
@@ -896,7 +992,7 @@ export default function GetStarted() {
           </div>
         </div>
       )}
-      <div className="flex-1 flex items-center justify-center py-12 px-6">
+      <div className="flex-1 flex items-start justify-center py-12 px-6 overflow-y-auto">
         <AnimatePresence mode="wait">
           <motion.div key={step} variants={slideVariants} initial="enter" animate="center" exit="exit"
             transition={{ duration: 0.25 }} className="w-full">
