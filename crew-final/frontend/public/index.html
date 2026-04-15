@@ -54,10 +54,12 @@
           (e.__SV = 1));
       })(document, window.posthog || []);
       posthog.init("phc_xAvL2Iq4tFmANRE7kzbKwaSqp1HJjN7x48s3vr0CMjs", {
-        api_host: "https://us.i.posthog.com",
-        person_profiles: "identified_only",
-        session_recording: { recordCrossOriginIframes: true, capturePerformance: false },
-      });
+  api_host: "https://us.i.posthog.com",
+  person_profiles: "identified_only",
+  disable_session_recording: true,
+  capture_pageview: true,
+  autocapture: false,
+});
     </script>
   </body>
 </html>
