@@ -46,6 +46,7 @@ export default function FindAPartner() {
   const [showFilters, setShowFilters] = useState(false);
   const [sort, setSort] = useState('best');
   const [savedIds, setSavedIds] = useState(new Set());
+  const [fetchKey, setFetchKey] = useState(0);
   const [filters, setFilters] = useState({
     sport: searchParams.get('sport') ? [searchParams.get('sport')] : [],
     city: [], level: [], gender: [],
@@ -53,17 +54,41 @@ export default function FindAPartner() {
 
   useEffect(() => {
     const fetchProfiles = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id,name,age,gender,city,area,lat,lng,sport,level,bio,photo_url,target_race,hyrox_category,hyrox_strong,hyrox_weak,hyrox_5k_time,marathon_pace,marathon_distance,marathon_weekly_km,marathon_goal,race_goal,training_days,partner_goal,partner_level_pref,partner_gender_pref,email_verified,last_active,profile_views,flagged')
-        .neq('flagged', true)
-        .neq('id', user?.id || '')
-        .not('name', 'is', null)
-        .order('last_active', { ascending: false })
-        .limit(100);
-      if (error) console.error('[FindAPartner] fetch error:', error.message);
-      const profs = data?.length ? data : SEED_PROFILES;
-      setAllProfiles(profs);
+      // Retry up to 2 times if we hit a lock error
+      let data = null;
+      let lastError = null;
+
+      for (let attempt = 0; attempt < 3; attempt++) {
+        if (attempt > 0) {
+          // Wait before retry — lock contention usually resolves in <500ms
+          await new Promise(r => setTimeout(r, 500 * attempt));
+        }
+        const result = await supabase
+          .from('profiles')
+          .select('id,name,age,gender,city,area,lat,lng,sport,level,bio,photo_url,target_race,hyrox_category,hyrox_strong,hyrox_weak,hyrox_5k_time,marathon_pace,marathon_distance,marathon_weekly_km,marathon_goal,race_goal,training_days,partner_goal,partner_level_pref,partner_gender_pref,email_verified,last_active,profile_views,flagged')
+          .neq('flagged', true)
+          .neq('id', user?.id || '')
+          .not('name', 'is', null)
+          .order('last_active', { ascending: false })
+          .limit(100);
+
+        if (!result.error) {
+          data = result.data;
+          lastError = null;
+          break;
+        }
+        lastError = result.error;
+        console.warn(`[FindAPartner] fetch attempt ${attempt + 1} failed:`, result.error.message);
+      }
+
+      if (lastError) {
+        console.error('[FindAPartner] fetch error after retries:', lastError.message);
+        // Do NOT fall back to seeds — show empty state so user knows something is wrong
+        setAllProfiles([]);
+      } else {
+        // Only use seeds if there are genuinely no real profiles in the DB
+        setAllProfiles(data?.length ? data : SEED_PROFILES);
+      }
       setLoading(false);
     };
 
@@ -75,7 +100,7 @@ export default function FindAPartner() {
 
     fetchProfiles();
     fetchSaved();
-  }, [user]);
+  }, [user, fetchKey]);
 
   useEffect(() => {
     let filtered = [...allProfiles];
@@ -339,12 +364,18 @@ export default function FindAPartner() {
                 </div>
               ) : (
                 <div className="text-center py-16">
-                  {allProfiles.length === 0 ? (
+                  {allProfiles.length === 0 && !loading ? (
                     <>
-                      <p className="font-inter text-lg font-semibold text-white mb-2">No athletes yet in your area.</p>
+                      <p className="font-inter text-lg font-semibold text-white mb-2">No athletes found.</p>
                       <p className="font-inter text-sm mb-4" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                        Be one of the first. Share CREW with your training group.
+                        This might be a temporary connection issue.
                       </p>
+                      <button
+                        onClick={() => { setLoading(true); setAllProfiles([]); setFetchKey(k => k + 1); }}
+                        className="font-inter text-sm font-semibold px-5 py-2 rounded-pill"
+                        style={{ background: '#D4880A', color: '#fff' }}>
+                        Try Again
+                      </button>
                     </>
                   ) : (
                     <>
