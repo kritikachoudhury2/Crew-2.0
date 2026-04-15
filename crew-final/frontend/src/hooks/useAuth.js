@@ -73,8 +73,12 @@ export function AuthProvider({ children }) {
           return;
         }
 
-        setSession(newSession);
-        setUser(newSession?.user ?? null);
+       // If session is null and we already loaded once, ignore — prevents
+// StrictMode double-mount from briefly setting user to null
+if (!newSession && initialLoadDone.current) return;
+
+setSession(newSession);
+setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
           const p = await ensureProfile(newSession.user.id, newSession.user.email);
