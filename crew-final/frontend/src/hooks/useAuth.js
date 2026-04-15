@@ -43,7 +43,6 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  // Track whether we've loaded the initial session — prevents resetting on TOKEN_REFRESHED
   const initialLoadDone = useRef(false);
 
   const refreshProfile = useCallback(async () => {
@@ -66,25 +65,21 @@ export function AuthProvider({ children }) {
       async (event, newSession) => {
         if (!mounted) return;
 
-        // On TOKEN_REFRESHED: update session silently, don't reset profile
-        if (event === 'TOKEN_REFRESHED' && initialLoadDone.current) {
+        // After first load, TOKEN_REFRESHED and INITIAL_SESSION must never
+        // trigger loading state changes or remount children — update session silently
+        if (initialLoadDone.current && (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
           setSession(newSession);
           setUser(newSession?.user ?? null);
           return;
         }
 
-       // If session is null and we already loaded once, ignore — prevents
-// StrictMode double-mount from briefly setting user to null
-if (!newSession && initialLoadDone.current) return;
-
-setSession(newSession);
-setUser(newSession?.user ?? null);
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
 
         if (newSession?.user) {
           const p = await ensureProfile(newSession.user.id, newSession.user.email);
           if (mounted) setProfile(p);
         } else {
-          // Only clear profile on explicit sign out, not on token refresh
           if (event === 'SIGNED_OUT') {
             if (mounted) setProfile(null);
           }
@@ -97,7 +92,6 @@ setUser(newSession?.user ?? null);
       }
     );
 
-    // Safety net: stop spinner after 4s
     const safetyTimer = setTimeout(() => {
       if (mounted) {
         setLoading(false);
