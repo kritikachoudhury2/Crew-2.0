@@ -33,8 +33,6 @@ const FILTER_LEVELS = [
   { val: 'intermediate', label: 'Intermediate' },
   { val: 'advanced', label: 'Advanced' },
   { val: 'pro', label: 'Pro' },
-  { val: 'elite', label: 'Elite' },
-  { val: 'rookie', label: 'Rookie' },
 ];
 
 export default function FindAPartner() {
