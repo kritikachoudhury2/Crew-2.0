@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { calcMatchScore, whyMatched, getMatchLabel, getMatchCaveat, parseSports } from '../lib/matching';
 import { SEED_PROFILES } from '../lib/seedProfiles';
-import { Filter, X, Heart, Eye, CheckCircle, ArrowRight } from 'lucide-react';
+import { Filter, X, Heart, Eye, CheckCircle, ArrowRight, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 function GradientAvatar({ name, size = 48 }) {
@@ -25,9 +25,7 @@ const sportBadge = (s) => {
 };
 const parseArr = (s) => { try { return typeof s === 'string' ? JSON.parse(s) : s || []; } catch { return []; } };
 
-// All cities including Other for users who typed custom city
 const FILTER_CITIES = ['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa', 'Chennai', 'Kolkata', 'Other'];
-// Updated level labels to match onboarding
 const FILTER_LEVELS = [
   { val: 'beginner', label: 'Beginner' },
   { val: 'intermediate', label: 'Intermediate' },
@@ -45,6 +43,8 @@ export default function FindAPartner() {
   const [sort, setSort] = useState('best');
   const [savedIds, setSavedIds] = useState(new Set());
   const [fetchKey, setFetchKey] = useState(0);
+  // connectionMap: { [profileId]: 'matched' | 'sent' | 'received' }
+  const [connectionMap, setConnectionMap] = useState({});
   const [filters, setFilters] = useState({
     sport: searchParams.get('sport') ? [searchParams.get('sport')] : [],
     city: [], level: [], gender: [],
@@ -56,12 +56,10 @@ export default function FindAPartner() {
       let lastError = null;
 
       for (let attempt = 0; attempt < 3; attempt++) {
-        if (attempt > 0) {
-          await new Promise(r => setTimeout(r, 500 * attempt));
-        }
+        if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt));
         const result = await supabase
           .from('profiles')
-          .select('id,name,age,gender,city,area,lat,lng,sport,level,bio,photo_url,target_race,hyrox_category,hyrox_strong,hyrox_weak,hyrox_5k_time,marathon_pace,marathon_distance,marathon_weekly_km,marathon_goal,race_goal,training_days,partner_goal,partner_level_pref,partner_gender_pref,email_verified,last_active,profile_views,flagged')
+          .select('id,name,age,gender,city,area,lat,lng,sport,level,bio,photo_url,target_race,hyrox_category,hyrox_strong,hyrox_weak,hyrox_5k_time,marathon_pace,marathon_distance,marathon_weekly_km,marathon_goal,race_goal,training_days,partner_goal,partner_level_pref,partner_gender_pref,email_verified,last_active,profile_views,flagged,phone')
           .neq('flagged', true)
           .neq('id', user?.id || '')
           .filter('name', 'not.is', null)
@@ -69,11 +67,7 @@ export default function FindAPartner() {
           .order('last_active', { ascending: false })
           .limit(200);
 
-        if (!result.error) {
-          data = result.data;
-          lastError = null;
-          break;
-        }
+        if (!result.error) { data = result.data; lastError = null; break; }
         lastError = result.error;
         console.warn(`[FindAPartner] fetch attempt ${attempt + 1} failed:`, result.error.message);
       }
@@ -93,8 +87,45 @@ export default function FindAPartner() {
       if (data) setSavedIds(new Set(data.map(r => r.saved_user_id)));
     };
 
+    // Fetch all connection states for current user in one go
+    const fetchConnectionStates = async () => {
+      if (!user) return;
+      const map = {};
+
+      // Matches
+      const { data: matches } = await supabase
+        .from('matches')
+        .select('user1_id, user2_id')
+        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
+      if (matches) {
+        matches.forEach(m => {
+          const partnerId = m.user1_id === user.id ? m.user2_id : m.user1_id;
+          map[partnerId] = 'matched';
+        });
+      }
+
+      // Sent requests
+      const { data: sent } = await supabase
+        .from('connect_requests')
+        .select('to_user_id')
+        .eq('from_user_id', user.id)
+        .eq('status', 'pending');
+      if (sent) sent.forEach(r => { if (!map[r.to_user_id]) map[r.to_user_id] = 'sent'; });
+
+      // Received requests
+      const { data: received } = await supabase
+        .from('connect_requests')
+        .select('from_user_id')
+        .eq('to_user_id', user.id)
+        .eq('status', 'pending');
+      if (received) received.forEach(r => { if (!map[r.from_user_id]) map[r.from_user_id] = 'received'; });
+
+      setConnectionMap(map);
+    };
+
     fetchProfiles();
     fetchSaved();
+    fetchConnectionStates();
   }, [user, fetchKey]);
 
   useEffect(() => {
@@ -107,7 +138,6 @@ export default function FindAPartner() {
     }
     if (filters.city.length) {
       filtered = filtered.filter(p => {
-        // "Other" in filter matches anyone whose city is not in the standard list
         const standardCities = ['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa', 'Chennai', 'Kolkata'];
         if (filters.city.includes('Other') && !standardCities.includes(p.city)) return true;
         return filters.city.includes(p.city);
@@ -133,6 +163,25 @@ export default function FindAPartner() {
     else if (sort === 'active') scored.sort((a, b) => new Date(b.last_active || 0) - new Date(a.last_active || 0));
     setResults(scored);
   }, [allProfiles, filters, sort, profile]);
+
+  const handleConnect = async (profileId) => {
+    if (!user) return;
+    const { count } = await supabase
+      .from('connect_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('from_user_id', user.id)
+      .gte('created_at', new Date(Date.now() - 86400000).toISOString());
+    if (count >= 10) {
+      toast.error("You've reached your daily limit of 10 connection requests.", { duration: 5000 });
+      return;
+    }
+    const { error } = await supabase.from('connect_requests').insert({
+      from_user_id: user.id, to_user_id: profileId, status: 'pending'
+    });
+    if (error) { toast.error('Could not send request.'); return; }
+    setConnectionMap(prev => ({ ...prev, [profileId]: 'sent' }));
+    toast.success(`Connection request sent!`);
+  };
 
   const toggleSave = async (profileId) => {
     if (!user) { toast.error('Sign in to save profiles'); return; }
@@ -169,6 +218,54 @@ export default function FindAPartner() {
       return `${p.marathon_pace ? `Pace: ${p.marathon_pace}/km` : ''} ${p.marathon_distance || ''} ${p.marathon_weekly_km ? `· ${p.marathon_weekly_km}` : ''}`.trim();
     }
     return '';
+  };
+
+  // Render the correct action button based on connection state
+  const renderConnectButton = (p) => {
+    const state = connectionMap[p.id];
+
+    if (state === 'matched') {
+      return (
+        <a
+          href={`https://wa.me/${(p.phone || '').replace(/\D/g, '')}?text=Hey!+We+matched+on+CREW+%E2%80%94+want+to+train%3F`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 text-center py-2 rounded-pill font-inter font-semibold text-xs flex items-center justify-center gap-1"
+          style={{ background: '#25D366', color: '#fff' }}>
+          <MessageCircle size={12} /> Open WhatsApp
+        </a>
+      );
+    }
+
+    if (state === 'sent') {
+      return (
+        <button disabled
+          className="flex-1 py-2 rounded-pill font-inter font-semibold text-xs opacity-70"
+          style={{ border: '2px solid #6B5FA0', color: '#fff', background: 'transparent' }}>
+          Request Sent
+        </button>
+      );
+    }
+
+    if (state === 'received') {
+      return (
+        <Link to={`/athlete/${p.id}`}
+          className="flex-1 text-center py-2 rounded-pill font-inter font-semibold text-xs"
+          style={{ background: '#4A3D8F', color: '#fff' }}>
+          Respond to Request →
+        </Link>
+      );
+    }
+
+    // Default: no connection yet
+    return (
+      <button
+        onClick={() => handleConnect(p.id)}
+        className="flex-1 py-2 rounded-pill font-inter font-semibold text-xs transition-all hover:scale-[1.02]"
+        style={{ background: '#D4880A', color: '#fff' }}>
+        Connect <ArrowRight size={12} className="inline ml-1" />
+      </button>
+    );
   };
 
   const isRecent = (d) => d && (new Date() - new Date(d)) < 7 * 86400000;
@@ -338,11 +435,7 @@ export default function FindAPartner() {
                       )}
 
                       <div className="flex gap-2">
-                        <Link to={`/athlete/${p.id}`}
-                          className="flex-1 text-center py-2 rounded-pill font-inter font-semibold text-xs transition-all hover:scale-[1.02]"
-                          style={{ background: '#D4880A', color: '#fff' }}>
-                          Connect <ArrowRight size={12} className="inline ml-1" />
-                        </Link>
+                        {renderConnectButton(p)}
                         <button onClick={() => toggleSave(p.id)}
                           className="px-3 py-2 rounded-pill transition-colors"
                           style={{
