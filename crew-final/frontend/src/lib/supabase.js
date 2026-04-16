@@ -7,11 +7,22 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.error('[CREW] Missing Supabase env vars.');
 }
 
+// ─── No-op lock implementation ────────────────────────────────────────────────
+// Supabase JS v2 uses the Web Locks API (navigator.locks) to serialize
+// auth token refreshes across tabs. In our app this causes "lock stolen"
+// errors because PostHog and other scripts compete for the same lock.
+//
+// This no-op implementation lets each acquire call succeed immediately —
+// there is no cross-tab serialization, but for a single-tab SPA this is
+// fine. Token refreshes are handled by autoRefreshToken internally anyway.
+const noopLock = async (name, acquireOptions, fn) => {
+  // Just call fn immediately without acquiring any lock
+  return await fn(null);
+};
+
 // ─── TRUE SINGLETON ───────────────────────────────────────────────────────────
-// Store the client on window so that even if this module is evaluated
-// multiple times (React hot reload, StrictMode double-invoke), only ONE
-// Supabase client ever exists. Multiple clients = multiple lock contestants
-// = "lock was stolen" errors on every refresh.
+// Stored on window so React hot-reloads and StrictMode double-invocations
+// never create a second client instance.
 if (!window.__CREW_SUPABASE__) {
   window.__CREW_SUPABASE__ = createClient(supabaseUrl || '', supabaseAnonKey || '', {
     auth: {
@@ -19,9 +30,9 @@ if (!window.__CREW_SUPABASE__) {
       persistSession: true,
       autoRefreshToken: true,
       flowType: 'implicit',
-      // Unique storage key isolates our lock from PostHog and any other
-      // libraries that might touch localStorage
       storageKey: 'crew-auth',
+      // Bypass Web Locks entirely — no lock contention possible
+      lock: noopLock,
     },
   });
 }
