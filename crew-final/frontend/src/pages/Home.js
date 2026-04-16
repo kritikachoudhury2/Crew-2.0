@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, Users, Trophy, Zap, ChevronRight, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { SEED_PROFILES } from '../lib/seedProfiles';
 
 function GradientAvatar({ name, size = 48 }) {
   const initials = (name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -82,7 +81,6 @@ function SportCard({ badge, badgeColor, desc, tags, sport, to }) {
 
 export default function Home() {
   const [events, setEvents] = useState([]);
-  const [profiles, setProfiles] = useState([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -92,10 +90,7 @@ export default function Home() {
         .order('event_date', { ascending: true }).limit(3);
       if (evts?.length) setEvents(evts);
 
-      const { data: profs } = await supabase.from('profiles')
-        .select('id,name,city,sport,level,bio,photo_url,email_verified,last_active')
-        .neq('flagged', true).not('name', 'is', null).limit(3);
-      setProfiles(profs?.length ? profs : SEED_PROFILES.slice(0, 3));
+    
     };
     fetchData();
   }, []);
