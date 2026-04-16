@@ -27,24 +27,14 @@ export default function Navbar() {
       <nav
         data-testid="main-navbar"
         className="sticky top-0 z-50 h-16 flex items-center justify-between px-6 md:px-12"
-        style={{
-          background: '#1C0A30',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-        }}
+        style={{ background: '#1C0A30', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
       >
         {/* Logo */}
         <Link to="/" className="no-underline flex flex-col leading-none gap-0.5" data-testid="nav-logo" onClick={() => setMobileOpen(false)}>
-          <span className="font-inter font-[800] text-2xl tracking-tight" style={{ color: '#FFFFFF', letterSpacing: '-1px' }}>
-            CREW
-          </span>
-          <a
-            href="https://www.grapelabs.in"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-inter font-normal text-[11px] no-underline"
-            style={{ color: '#6B5FA0' }}
-            onClick={(e) => e.stopPropagation()}
-          >
+          <span className="font-inter font-[800] text-2xl tracking-tight" style={{ color: '#FFFFFF', letterSpacing: '-1px' }}>CREW</span>
+          <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
+            className="font-inter font-normal text-[11px] no-underline" style={{ color: '#6B5FA0' }}
+            onClick={e => e.stopPropagation()}>
             by GrapeLabs <span style={{ color: '#D4880A' }}>AI</span>
           </a>
         </Link>
@@ -52,12 +42,9 @@ export default function Navbar() {
         {/* Desktop Links */}
         <div className="hidden md:flex items-center gap-8">
           {navLinks.map(link => (
-            <Link
-              key={link.to}
-              to={link.to}
+            <Link key={link.to} to={link.to}
               className="font-inter font-medium text-sm transition-colors duration-200"
-              style={{ color: isActive(link.to) ? '#D4880A' : 'rgba(255,255,255,0.75)' }}
-            >
+              style={{ color: isActive(link.to) ? '#D4880A' : 'rgba(255,255,255,0.75)' }}>
               {link.label}
             </Link>
           ))}
@@ -67,7 +54,7 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-4">
           {user ? (
             <div className="flex items-center gap-3">
-              <Link to="/my-connections" className="p-2 rounded-full" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              <Link to="/my-connections" className="p-2 rounded-full" style={{ color: isActive('/my-connections') ? '#D4880A' : 'rgba(255,255,255,0.6)' }}>
                 <Users size={18} />
               </Link>
               <Link to="/profile/edit"
@@ -88,32 +75,29 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile hamburger */}
-        <div className="flex md:hidden items-center">
-          <button
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="p-2 z-50 relative"
-            style={{ color: '#fff' }}
-          >
+        {/* Mobile right side — connections icon + hamburger */}
+        <div className="flex md:hidden items-center gap-2">
+          {user && (
+            <Link to="/my-connections" onClick={() => setMobileOpen(false)}
+              className="p-2 rounded-full"
+              style={{ color: isActive('/my-connections') ? '#D4880A' : 'rgba(255,255,255,0.7)' }}>
+              <Users size={22} />
+            </Link>
+          )}
+          <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 z-50 relative" style={{ color: '#fff' }}>
             {mobileOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
       </nav>
 
-      {/* Mobile Menu — rendered OUTSIDE nav as full-screen overlay */}
+      {/* Mobile Menu overlay */}
       {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-6"
-          style={{ background: '#1C0A30', top: '64px' }}
-        >
+        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-6"
+          style={{ background: '#1C0A30', top: '64px' }}>
           {navLinks.map(link => (
-            <Link
-              key={link.to}
-              to={link.to}
-              onClick={() => setMobileOpen(false)}
+            <Link key={link.to} to={link.to} onClick={() => setMobileOpen(false)}
               className="font-inter font-semibold text-2xl"
-              style={{ color: isActive(link.to) ? '#D4880A' : '#fff' }}
-            >
+              style={{ color: isActive(link.to) ? '#D4880A' : '#fff' }}>
               {link.label}
             </Link>
           ))}
