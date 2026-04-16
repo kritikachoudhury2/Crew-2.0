@@ -154,7 +154,7 @@ export default function Home() {
                 className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider"
                 style={{ color: '#7C6FD4', background: 'rgba(124,111,212,0.10)', border: '1px solid rgba(124,111,212,0.25)' }}>
                 {/* PATCH 3: explicit space before AI span */}
-                BUILT USING AI-POWERED SYSTEMS BY GRAPELABS{' '}<span style={{ color: '#D4880A', marginLeft: 2 }}>AI</span> <ExternalLink size={12} />
+                BUILT USING AI-POWERED SYSTEMS BY GRAPELABS<span style={{ color: '#D4880A', marginLeft: 1 }}>AI</span> <ExternalLink size={12} />
               </a>
             </div>
           </div>
