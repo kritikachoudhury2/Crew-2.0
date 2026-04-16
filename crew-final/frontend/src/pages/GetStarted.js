@@ -83,6 +83,7 @@ export default function GetStarted() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [events, setEvents] = useState([]);
+  const [validationError, setValidationError] = useState('');
 
   const getStepSequence = useCallback((sports) => {
     const seq = ['sport-select'];
@@ -184,6 +185,7 @@ export default function GetStarted() {
   };
 
   const goBack = () => {
+    setValidationError('');
     const seq = getStepSequence(getCurrentSports());
     const idx = seq.indexOf(step);
     if (idx > 0) setStep(seq[idx - 1]);
@@ -272,7 +274,7 @@ export default function GetStarted() {
     return true;
   };
 
-  const update = (key, val) => setAnswers(prev => ({ ...prev, [key]: val }));
+  const update = (key, val) => { setValidationError(''); setAnswers(prev => ({ ...prev, [key]: val })); };
   const toggleArray = (key, val, maxSelect = null) => {
     const arr = Array.isArray(answers[key]) ? answers[key] : [];
     if (arr.includes(val)) {
@@ -284,6 +286,52 @@ export default function GetStarted() {
       }
       update(key, [...arr, val]);
     }
+  };
+
+  const validateStep = (currentStep) => {
+    switch (currentStep) {
+      case 'hyrox-race':
+        if (!answers.hyrox_category) return 'Please choose your HYROX category.';
+        if (!answers._hyrox_exp) return 'Please select your race experience.';
+        return '';
+      case 'hyrox-fitness':
+        if (!answers.hyrox_level) return 'Please select your fitness level.';
+        if (!answers.hyrox_race_goal) return 'Please select your race goal.';
+        if (!answers.hyrox_training_days) return 'Please select your training days per week.';
+        return '';
+      case 'hyrox-stations':
+        if (!answers.hyrox_partner_goal) return 'Please choose your ideal training partner type.';
+        if (!answers.hyrox_partner_level_pref) return 'Please choose your preferred partner level.';
+        if (!answers.hyrox_partner_gender_pref) return 'Please select your gender preference.';
+        return '';
+      case 'marathon-race':
+        if (!answers.marathon_distance) return 'Please select the distance you are training for.';
+        if (!answers._marathon_exp) return 'Please select your race experience.';
+        return '';
+      case 'marathon-training':
+        if (!answers.marathon_level) return 'Please select your fitness level.';
+        if (!answers.marathon_weekly_km) return 'Please select your average weekly distance.';
+        if (!answers.marathon_training_days) return 'Please select your training days per week.';
+        return '';
+      case 'marathon-partner':
+        if (!answers.marathon_goal) return 'Please select your race goal.';
+        if (!answers.marathon_partner_goal) return 'Please choose your ideal training partner type.';
+        if (!answers.marathon_partner_level_pref) return 'Please choose your preferred partner level.';
+        if (!answers.marathon_partner_gender_pref) return 'Please select your gender preference.';
+        return '';
+      default:
+        return '';
+    }
+  };
+
+  const goNextValidated = () => {
+    const err = validateStep(step);
+    if (err) {
+      setValidationError(err);
+      return;
+    }
+    setValidationError('');
+    goNext();
   };
 
   const slideVariants = {
@@ -392,7 +440,7 @@ export default function GetStarted() {
             <h2 className="font-inter font-[800] text-3xl text-white mb-6">Your race.</h2>
             <div className="space-y-6">
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Which race are you targeting?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Which race are you targeting? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span></label>
                 <select value={answers.hyrox_target_race || ''}
                   onChange={e => { update('hyrox_target_race', e.target.value); update('target_race', e.target.value); }}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
@@ -432,7 +480,8 @@ export default function GetStarted() {
                   }} />
               </div>
             </div>
-            <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            {validationError && <p className="font-inter text-sm mt-4" style={{ color: '#ef4444' }}>⚠ {validationError}</p>}
+            <NavButtons onBack={goBack} onNext={goNextValidated} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
           </div>
         );
 
@@ -497,7 +546,8 @@ export default function GetStarted() {
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
               </div>
             </div>
-            <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            {validationError && <p className="font-inter text-sm mt-4" style={{ color: '#ef4444' }}>⚠ {validationError}</p>}
+            <NavButtons onBack={goBack} onNext={goNextValidated} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
           </div>
         );
 
@@ -511,14 +561,14 @@ export default function GetStarted() {
             <div className="space-y-6">
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">
-                  What are your strengths? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>Select up to 3</span>
+                  What are your strengths? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional — select up to 3)</span>
                 </label>
                 <ChipSelect options={HYROX_STATIONS} selected={answers.hyrox_strong || []}
                   onToggle={v => toggleArray('hyrox_strong', v, 3)} maxSelect={3} />
               </div>
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">
-                  Where do you want to improve? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>Select up to 3</span>
+                  Where do you want to improve? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional — select up to 3)</span>
                 </label>
                 <ChipSelect options={HYROX_STATIONS} selected={answers.hyrox_weak || []}
                   onToggle={v => toggleArray('hyrox_weak', v, 3)} maxSelect={3} />
@@ -552,7 +602,8 @@ export default function GetStarted() {
                   onToggle={v => { update('hyrox_partner_gender_pref', v); update('partner_gender_pref', v); }} />
               </div>
             </div>
-            <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            {validationError && <p className="font-inter text-sm mt-4" style={{ color: '#ef4444' }}>⚠ {validationError}</p>}
+            <NavButtons onBack={goBack} onNext={goNextValidated} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
           </div>
         );
 
@@ -600,7 +651,8 @@ export default function GetStarted() {
                   }} />
               </div>
             </div>
-            <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            {validationError && <p className="font-inter text-sm mt-4" style={{ color: '#ef4444' }}>⚠ {validationError}</p>}
+            <NavButtons onBack={goBack} onNext={goNextValidated} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
           </div>
         );
 
@@ -644,12 +696,13 @@ export default function GetStarted() {
               </div>
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Training days per week</label>
-                <ChipSelect options={['2–3 days', '4–5 days', '6–7 days']}
+                <ChipSelect options={['1–2 days', '2–3 days', '4–5 days', '6–7 days']}
                   selected={answers.marathon_training_days} multi={false}
                   onToggle={v => { update('marathon_training_days', v); if (!answers.hyrox_training_days) update('training_days', v); }} />
               </div>
             </div>
-            <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            {validationError && <p className="font-inter text-sm mt-4" style={{ color: '#ef4444' }}>⚠ {validationError}</p>}
+            <NavButtons onBack={goBack} onNext={goNextValidated} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
           </div>
         );
 
@@ -705,7 +758,8 @@ export default function GetStarted() {
                   onToggle={v => { update('marathon_partner_gender_pref', v); if (!answers.hyrox_partner_gender_pref) update('partner_gender_pref', v); }} />
               </div>
             </div>
-            <NavButtons onBack={goBack} onNext={goNext} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            {validationError && <p className="font-inter text-sm mt-4" style={{ color: '#ef4444' }}>⚠ {validationError}</p>}
+            <NavButtons onBack={goBack} onNext={goNextValidated} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
           </div>
         );
 
