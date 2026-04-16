@@ -20,11 +20,12 @@ function GradientAvatar({ name, size = 80 }) {
 }
 
 function StatCard({ label, val }) {
-  if (!val) return null;
+  const displayVal = typeof val === 'string' ? val.trim() : val;
+  if (!displayVal) return null;
   return (
     <div className="rounded-[12px] p-3 border" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)' }}>
       <p className="font-inter text-[10px] uppercase tracking-wider mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>{label}</p>
-      <p className="font-inter text-sm font-medium text-white capitalize">{val}</p>
+      <p className="font-inter text-sm font-medium text-white capitalize">{displayVal}</p>
     </div>
   );
 }
@@ -228,17 +229,17 @@ export default function AthleteProfile() {
                 <span className="w-2 h-2 rounded-full" style={{ background: '#4A3D8F', display: 'inline-block' }} /> HYROX Details
               </h3>
               {hasHyroxStats && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                   {athlete.hyrox_category && (
-                    <div>
-                      <p className="font-inter text-[10px] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Category</p>
-                      <span className="px-2 py-0.5 rounded-pill text-[10px] font-inter font-bold text-white" style={{ background: '#4A3D8F' }}>{athlete.hyrox_category.toUpperCase()}</span>
+                    <div className="rounded-[12px] p-3 border" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)' }}>
+                      <p className="font-inter text-[10px] uppercase tracking-wider mb-1.5" style={{ color: 'rgba(255,255,255,0.4)' }}>Category</p>
+                      <span className="px-2 py-0.5 rounded-pill text-[10px] font-inter font-bold text-white" style={{ background: '#4A3D8F' }}>{athlete.hyrox_category.replace('_', ' ').toUpperCase()}</span>
                     </div>
                   )}
-                  {athlete.hyrox_5k_time && (
-                    <div>
-                      <p className="font-inter text-[10px] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>5K Time</p>
-                      <p className="font-inter text-sm text-white">{athlete.hyrox_5k_time}</p>
+                  {athlete.hyrox_5k_time?.trim() && (
+                    <div className="rounded-[12px] p-3 border" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)' }}>
+                      <p className="font-inter text-[10px] uppercase tracking-wider mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>5K Time</p>
+                      <p className="font-inter text-sm font-medium text-white">{athlete.hyrox_5k_time.trim()}</p>
                     </div>
                   )}
                   <StatCard label="Target Race" val={hyroxVal('hyrox_target_race', 'target_race')} />
@@ -284,7 +285,7 @@ export default function AthleteProfile() {
                 <span className="w-2 h-2 rounded-full" style={{ background: '#D4880A', display: 'inline-block' }} /> Marathon Details
               </h3>
               {hasMarathonStats && (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                   {athlete.marathon_distance && <StatCard label="Distance" val={athlete.marathon_distance} />}
                   {athlete.marathon_pace && <StatCard label="Easy Pace" val={`${athlete.marathon_pace}/km`} />}
                   {athlete.marathon_weekly_km && <StatCard label="Weekly KM" val={athlete.marathon_weekly_km} />}
