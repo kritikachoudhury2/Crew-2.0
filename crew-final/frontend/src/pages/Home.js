@@ -220,76 +220,81 @@ export default function Home() {
       </section>
 
      {/* Athletes already on CREW — hardcoded showcase profiles */}
-{[
-  {
-    id: 'showcase-1',
-    name: 'Aryan',
-    city: 'Delhi',
-    area: 'South Delhi',
-    sport: '["hyrox"]',
-    level: 'intermediate',
-    bio: "Software engineer who found HYROX two years ago and hasn't looked back. Training 5 days a week, targeting sub-90 Open. Looking for someone who takes sessions seriously but keeps it fun.",
-  },
-  {
-    id: 'showcase-2',
-    name: 'Priya',
-    city: 'Mumbai',
-    area: 'Bandra',
-    sport: '["marathon"]',
-    level: 'advanced',
-    bio: "Ran my first full marathon in 4:10, targeting 3:45 at Tata Mumbai 2027. I run 70km weeks. Looking for a long-run partner who won't cancel on Sunday mornings.",
-  },
-  {
-    id: 'showcase-3',
-    name: 'Kabir',
-    city: 'Bangalore',
-    area: 'Koramangala',
-    sport: '["hyrox","marathon"]',
-    level: 'advanced',
-    bio: "Founder by day, HYROX Doubles racer by weekend. Also running TCS World 10K every year. Want someone who trains across both disciplines and understands the grind.",
-  },
-].map((p) => (
-  <div key={p.id} className="rounded-[20px] p-5 border flex flex-col transition-all hover:-translate-y-1"
-    style={{ background: 'rgba(42,26,69,0.80)', borderColor: 'rgba(74,61,143,0.30)' }}>
-    <div className="flex items-center gap-3 mb-3">
-      <GradientAvatar name={p.name} size={44} />
-      <div className="min-w-0">
-        <p className="font-inter font-semibold text-sm text-white">{p.name}</p>
-        <p className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-          {p.city} · {p.area}
-        </p>
-      </div>
-    </div>
-    <div className="flex flex-wrap gap-1.5 mb-3">
-      {parseSport(p.sport).filter(s => s !== 'ironman').map(s => {
-        const b = sportBadge(s);
-        return (
-          <span key={s} className="px-2 py-0.5 rounded-pill text-[10px] font-inter font-bold text-white"
-            style={{ background: b.bg }}>{b.label}</span>
-        );
-      })}
-      {p.level && (
-        <span className="px-2 py-0.5 rounded-pill text-[10px] font-inter capitalize"
-          style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)' }}>
-          {p.level}
-        </span>
-      )}
-    </div>
-    <p className="font-inter text-xs mb-3 flex-1"
-      style={{ color: 'rgba(255,255,255,0.6)', display: '-webkit-box',
-        WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-      {p.bio}
-    </p>
-    <Link to="/get-started"
-      className="mt-auto font-inter font-semibold text-xs flex items-center gap-1"
-      style={{ color: '#D4880A' }}>
-      View Profile <ChevronRight size={14} />
-    </Link>
-  </div>
-))}
+<section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#1C0A30' }}>
+  <div className="max-w-7xl mx-auto">
+    <span className="block font-inter font-semibold text-xs tracking-[0.2em] uppercase mb-3" style={{ color: '#D4880A' }}>ATHLETES ON CREW</span>
+    <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-12">Already training with us.</h2>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {[
+        {
+          id: 'showcase-1',
+          name: 'Aryan',
+          city: 'Delhi',
+          area: 'South Delhi',
+          sport: '["hyrox"]',
+          level: 'intermediate',
+          bio: "Software engineer who found HYROX two years ago and hasn't looked back. Training 5 days a week, targeting sub-90 Open. Looking for someone who takes sessions seriously but keeps it fun.",
+        },
+        {
+          id: 'showcase-2',
+          name: 'Priya',
+          city: 'Mumbai',
+          area: 'Bandra',
+          sport: '["marathon"]',
+          level: 'advanced',
+          bio: "Ran my first full marathon in 4:10, targeting 3:45 at Tata Mumbai 2027. I run 70km weeks. Looking for a long-run partner who won't cancel on Sunday mornings.",
+        },
+        {
+          id: 'showcase-3',
+          name: 'Kabir',
+          city: 'Bangalore',
+          area: 'Koramangala',
+          sport: '["hyrox","marathon"]',
+          level: 'advanced',
+          bio: "Founder by day, HYROX Doubles racer by weekend. Also running TCS World 10K every year. Want someone who trains across both disciplines and understands the grind.",
+        },
+      ].map((p) => (
+        <div key={p.id} className="rounded-[20px] p-5 border flex flex-col transition-all hover:-translate-y-1"
+          style={{ background: 'rgba(42,26,69,0.80)', borderColor: 'rgba(74,61,143,0.30)' }}>
+          <div className="flex items-center gap-3 mb-3">
+            <GradientAvatar name={p.name} size={44} />
+            <div className="min-w-0">
+              <p className="font-inter font-semibold text-sm text-white">{p.name}</p>
+              <p className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                {p.city} · {p.area}
+              </p>
+            </div>
           </div>
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {parseSport(p.sport).filter(s => s !== 'ironman').map(s => {
+              const b = sportBadge(s);
+              return (
+                <span key={s} className="px-2 py-0.5 rounded-pill text-[10px] font-inter font-bold text-white"
+                  style={{ background: b.bg }}>{b.label}</span>
+              );
+            })}
+            {p.level && (
+              <span className="px-2 py-0.5 rounded-pill text-[10px] font-inter capitalize"
+                style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)' }}>
+                {p.level}
+              </span>
+            )}
+          </div>
+          <p className="font-inter text-xs mb-3 flex-1"
+            style={{ color: 'rgba(255,255,255,0.6)', display: '-webkit-box',
+              WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {p.bio}
+          </p>
+          <Link to="/get-started"
+            className="mt-auto font-inter font-semibold text-xs flex items-center gap-1"
+            style={{ color: '#D4880A' }}>
+            View Profile <ChevronRight size={14} />
+          </Link>
         </div>
-      </section>
+      ))}
+    </div>
+  </div>
+</section>
 
       {/* UPCOMING EVENTS */}
       <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#2A1A45' }}>
