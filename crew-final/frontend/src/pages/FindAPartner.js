@@ -127,7 +127,7 @@ export default function FindAPartner() {
       matchWhy: profile ? whyMatched(viewer, p) : 'Complete your profile for better matches',
       matchLabel: getMatchLabel(profile ? calcMatchScore(viewer, p) : 30),
       matchCaveat: profile ? getMatchCaveat(viewer, p) : null,
-    })).filter(x => x.matchScore >= 0);
+    })).filter(x => x.matchScore >= 50); // 50% minimum threshold
 
     if (sort === 'best') scored.sort((a, b) => b.matchScore - a.matchScore);
     else if (sort === 'newest') scored.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
