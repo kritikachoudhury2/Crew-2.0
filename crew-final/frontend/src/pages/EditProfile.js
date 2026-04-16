@@ -6,16 +6,11 @@ import { Camera, Save, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CITIES = ['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa', 'Chennai', 'Kolkata', 'Other'];
-
 const parseArr = (s) => { try { return typeof s === 'string' ? JSON.parse(s) : s || []; } catch { return []; } };
 
 function calcCompleteness(form) {
-  const fields = [
-    form.name, form.age, form.gender, form.city,
-    form.sport?.length, form.level, form.partner_goal,
-  ];
-  const filled = fields.filter(Boolean).length;
-  return Math.round((filled / fields.length) * 100);
+  const fields = [form.name, form.age, form.gender, form.city, form.sport?.length, form.level, form.partner_goal];
+  return Math.round((fields.filter(Boolean).length / fields.length) * 100);
 }
 
 export default function EditProfile() {
@@ -27,24 +22,39 @@ export default function EditProfile() {
 
   useEffect(() => {
     if (profile) {
+      // Extract country code and number from stored phone
+      let storedPhone = profile.phone || '';
+      let countryCode = '+91';
+      let phoneNumber = storedPhone;
+      const codes = ['+971', '+66', '+1', '+44', '+65', '+91'];
+      for (const code of codes) {
+        if (storedPhone.startsWith(code)) {
+          countryCode = code;
+          phoneNumber = storedPhone.slice(code.length);
+          break;
+        }
+      }
       setForm({
         ...profile,
         sport: parseSportList(profile.sport),
         hyrox_strong: parseArr(profile.hyrox_strong),
         hyrox_weak: parseArr(profile.hyrox_weak),
+        _countryCode: countryCode,
+        _phoneNumber: phoneNumber,
       });
     }
   }, [profile]);
 
   function parseSportList(s) { try { return typeof s === 'string' ? JSON.parse(s) : s || []; } catch { return [s]; } }
-
   const update = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
 
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
-
     const cityValue = form.city === 'Other' ? (form.city_custom || 'Other') : form.city;
+    const fullPhone = form._phoneNumber?.trim()
+      ? `${form._countryCode}${form._phoneNumber.trim()}`.replace(/\D/g, '')
+      : null;
 
     const data = {
       id: user.id,
@@ -70,16 +80,13 @@ export default function EditProfile() {
       partner_level_pref: form.partner_level_pref,
       partner_gender_pref: form.partner_gender_pref,
       instagram: form.instagram,
+      phone: fullPhone,
       flagged: false,
       last_active: new Date().toISOString(),
     };
 
     const { error } = await supabase.from('profiles').upsert(data, { onConflict: 'id' });
-    if (error) {
-      toast.error('Could not save your profile. Please try again.');
-      setSaving(false);
-      return;
-    }
+    if (error) { toast.error('Could not save your profile. Please try again.'); setSaving(false); return; }
     await refreshProfile();
     setSaving(false);
     toast.success('Profile saved!');
@@ -119,31 +126,20 @@ export default function EditProfile() {
               <span className="font-inter font-bold text-sm" style={{ color: completeness >= 80 ? '#4ade80' : '#D4880A' }}>{completeness}%</span>
             </div>
             <div className="w-full h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
-              <div className="h-full rounded-full transition-all duration-300"
-                style={{ width: `${completeness}%`, background: completeness >= 80 ? '#4ade80' : '#D4880A' }} />
+              <div className="h-full rounded-full transition-all duration-300" style={{ width: `${completeness}%`, background: completeness >= 80 ? '#4ade80' : '#D4880A' }} />
             </div>
-            {completeness < 80 && (
-              <p className="font-inter text-[11px] mt-2" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                Complete your profile to get better matches.
-              </p>
-            )}
+            {completeness < 80 && <p className="font-inter text-[11px] mt-2" style={{ color: 'rgba(255,255,255,0.5)' }}>Complete your profile to get better matches.</p>}
           </div>
 
           {/* Photo */}
           <div className="flex items-center gap-4 mb-8">
             <div className="relative">
-              {form.photo_url ? (
-                <img src={form.photo_url} alt="Avatar" className="w-20 h-20 rounded-full object-cover" />
-              ) : (
-                <div className="w-20 h-20 rounded-full flex items-center justify-center font-inter font-bold text-xl text-white"
-                  style={{ background: 'linear-gradient(135deg, #4A3D8F, #D4880A)' }}>
-                  {(form.name || 'U')[0]?.toUpperCase()}
-                </div>
-              )}
-              <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
-                style={{ background: '#D4880A' }}>
+              {form.photo_url
+                ? <img src={form.photo_url} alt="Avatar" className="w-20 h-20 rounded-full object-cover" />
+                : <div className="w-20 h-20 rounded-full flex items-center justify-center font-inter font-bold text-xl text-white" style={{ background: 'linear-gradient(135deg, #4A3D8F, #D4880A)' }}>{(form.name || 'U')[0]?.toUpperCase()}</div>}
+              <label className="absolute bottom-0 right-0 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer" style={{ background: '#D4880A' }}>
                 <Camera size={14} className="text-white" />
-                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" data-testid="photo-upload" />
+                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
               </label>
             </div>
             <div>
@@ -159,35 +155,35 @@ export default function EditProfile() {
                 className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
                 style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} data-testid="edit-name" />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-1.5">Age</label>
                 <input type="number" value={form.age || ''} onChange={e => update('age', e.target.value)}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
-                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} data-testid="edit-age" />
+                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
               </div>
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-1.5">Gender</label>
                 <select value={form.gender || ''} onChange={e => update('gender', e.target.value)}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
-                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} data-testid="edit-gender">
+                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
                   <option value="">Select</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                  <option value="Prefer not to say">Prefer not to say</option>
+                  <option>Male</option><option>Female</option><option>Other</option><option>Prefer not to say</option>
                 </select>
               </div>
             </div>
+
             <div>
               <label className="font-inter text-xs font-medium text-white block mb-1.5">City</label>
               <select value={form.city || ''} onChange={e => update('city', e.target.value)}
                 className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
-                style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} data-testid="edit-city">
+                style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
                 <option value="">Select city</option>
                 {CITIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
+
             {form.city === 'Other' && (
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-1.5">Enter your city</label>
@@ -197,30 +193,58 @@ export default function EditProfile() {
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
               </div>
             )}
+
             <div>
               <label className="font-inter text-xs font-medium text-white block mb-1.5">Area</label>
-              <input type="text" value={form.area || ''} onChange={e => update('area', e.target.value)} placeholder="e.g. South Delhi"
+              <input type="text" value={form.area || ''} onChange={e => update('area', e.target.value)}
+                placeholder="e.g. South Delhi"
                 className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
-                style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} data-testid="edit-area" />
+                style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
             </div>
+
+            {/* PHONE — critical for WhatsApp connections */}
+            <div>
+              <label className="font-inter text-xs font-medium text-white block mb-1.5">
+                Phone number <span style={{ color: '#D4880A' }}>*</span>
+                <span className="ml-2 font-normal" style={{ color: 'rgba(255,255,255,0.4)' }}>Used for WhatsApp when you match</span>
+              </label>
+              <div className="flex gap-2">
+                <select value={form._countryCode || '+91'} onChange={e => update('_countryCode', e.target.value)}
+                  className="px-3 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
+                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
+                  {['+91', '+971', '+66', '+1', '+44', '+65'].map(c => <option key={c}>{c}</option>)}
+                </select>
+                <input type="tel" value={form._phoneNumber || ''} onChange={e => update('_phoneNumber', e.target.value)}
+                  placeholder="9876543210"
+                  className="flex-1 px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
+                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
+              </div>
+              <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                Never shown publicly. Only used to open WhatsApp after a mutual match.
+              </p>
+            </div>
+
             <div>
               <label className="font-inter text-xs font-medium text-white block mb-1.5">Bio</label>
-              <textarea value={form.bio || ''} onChange={e => update('bio', e.target.value.slice(0, 200))} rows={3} maxLength={200}
+              <textarea value={form.bio || ''} onChange={e => update('bio', e.target.value.slice(0, 200))}
+                rows={3} maxLength={200}
                 className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none resize-none"
-                style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} data-testid="edit-bio" />
+                style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
               <p className="font-inter text-[11px] text-right" style={{ color: 'rgba(255,255,255,0.3)' }}>{(form.bio || '').length}/200</p>
             </div>
+
             <div>
               <label className="font-inter text-xs font-medium text-white block mb-1.5">Instagram</label>
-              <input type="text" value={form.instagram || ''} onChange={e => update('instagram', e.target.value)} placeholder="@handle"
+              <input type="text" value={form.instagram || ''} onChange={e => update('instagram', e.target.value)}
+                placeholder="@handle"
                 className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
-                style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} data-testid="edit-instagram" />
+                style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
             </div>
           </div>
 
           <button onClick={handleSave} disabled={saving}
             className="w-full mt-8 py-3 rounded-pill font-inter font-bold text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50"
-            style={{ background: '#D4880A', color: '#fff' }} data-testid="save-profile-btn">
+            style={{ background: '#D4880A', color: '#fff' }}>
             <Save size={16} /> {saving ? 'Saving...' : 'Save Changes'}
           </button>
 
@@ -229,7 +253,7 @@ export default function EditProfile() {
             {!showDelete ? (
               <button onClick={() => setShowDelete(true)}
                 className="px-4 py-2 rounded-pill font-inter text-xs font-medium flex items-center gap-2"
-                style={{ border: '2px solid #ef4444', color: '#ef4444' }} data-testid="delete-account-btn">
+                style={{ border: '2px solid #ef4444', color: '#ef4444' }}>
                 <Trash2 size={14} /> Delete Account
               </button>
             ) : (
@@ -241,7 +265,7 @@ export default function EditProfile() {
                 <div className="flex gap-2">
                   <button onClick={handleDeleteAccount}
                     className="px-4 py-2 rounded-pill font-inter text-xs font-bold"
-                    style={{ background: '#ef4444', color: '#fff' }} data-testid="confirm-delete">
+                    style={{ background: '#ef4444', color: '#fff' }}>
                     Yes, delete my account
                   </button>
                   <button onClick={() => setShowDelete(false)}
