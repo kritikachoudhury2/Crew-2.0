@@ -21,11 +21,12 @@ function HeroProfileCard({ name, city, sport, matchPct, delay }) {
     <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay }}
       className="rounded-[20px] p-4 backdrop-blur-xl border"
       style={{ background: 'rgba(42,26,69,0.80)', borderColor: 'rgba(74,61,143,0.30)' }}>
-      <div className="flex items-center gap-3 mb-3">
-        <GradientAvatar name={name} size={44} />
-        <div>
-          <p className="font-inter font-semibold text-sm text-white">{name}</p>
-          <p className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.6)' }}>{city} · {sport}</p>
+      {/* PATCH 2: min-w-0 + flex-1 + truncate to fix mobile overflow */}
+      <div className="flex items-center gap-3 mb-3 min-w-0">
+        <GradientAvatar name={name} size={40} />
+        <div className="min-w-0 flex-1">
+          <p className="font-inter font-semibold text-sm text-white truncate">{name}</p>
+          <p className="font-inter text-xs truncate" style={{ color: 'rgba(255,255,255,0.6)' }}>{city} · {sport}</p>
         </div>
       </div>
       <div className="w-full h-1 rounded-full mb-1.5" style={{ background: 'rgba(255,255,255,0.1)' }}>
@@ -89,8 +90,6 @@ export default function Home() {
         .gte('event_date', today).eq('is_active', true)
         .order('event_date', { ascending: true }).limit(3);
       if (evts?.length) setEvents(evts);
-
-    
     };
     fetchData();
   }, []);
@@ -130,7 +129,8 @@ export default function Home() {
                 See How It Works
               </Link>
             </div>
-            <div className="flex flex-wrap gap-3">
+            {/* PATCH 4: gap-3 → gap-2 for better mobile wrapping */}
+            <div className="flex flex-wrap gap-2">
               <span className="inline-flex items-center gap-2 px-4 py-2 rounded-pill font-inter font-medium text-[13px]"
                 style={{ color: 'rgba(255,255,255,0.8)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
                 <Users size={14} /> 500+ Athletes matched
@@ -142,6 +142,10 @@ export default function Home() {
             </div>
           </div>
           <div className="flex flex-col gap-4 lg:pt-8">
+            <p className="font-inter text-xs px-3 py-2 rounded-[10px] text-center"
+              style={{ background: 'rgba(74,61,143,0.20)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(74,61,143,0.25)' }}>
+              Example profiles — sign up to see real athletes near you.
+            </p>
             <HeroProfileCard name="Arjun M." city="Delhi" sport="HYROX" matchPct={87} delay={0.1} />
             <HeroProfileCard name="Ayesha N." city="Bangalore" sport="Marathon" matchPct={74} delay={0.25} />
             <HeroProfileCard name="Vikram T." city="Mumbai" sport="HYROX + Marathon" matchPct={68} delay={0.4} />
@@ -149,7 +153,8 @@ export default function Home() {
               <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider"
                 style={{ color: '#7C6FD4', background: 'rgba(124,111,212,0.10)', border: '1px solid rgba(124,111,212,0.25)' }}>
-                BUILT USING AI-POWERED SYSTEMS BY GRAPELABS <span style={{ color: '#D4880A', marginLeft: 2 }}>AI</span> <ExternalLink size={12} />
+                {/* PATCH 3: explicit space before AI span */}
+                BUILT USING AI-POWERED SYSTEMS BY GRAPELABS{' '}<span style={{ color: '#D4880A', marginLeft: 2 }}>AI</span> <ExternalLink size={12} />
               </a>
             </div>
           </div>
@@ -201,7 +206,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* SPORT CARDS — wider, centered, 2 col */}
+      {/* SPORT CARDS */}
       <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#2A1A45' }}>
         <div className="max-w-7xl mx-auto">
           <span className="block font-inter font-semibold text-xs tracking-[0.2em] uppercase mb-3" style={{ color: '#D4880A' }}>BUILT FOR EVERY ENDURANCE ATHLETE</span>
@@ -219,82 +224,83 @@ export default function Home() {
         </div>
       </section>
 
-     {/* Athletes already on CREW — hardcoded showcase profiles */}
-<section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#1C0A30' }}>
-  <div className="max-w-7xl mx-auto">
-    <span className="block font-inter font-semibold text-xs tracking-[0.2em] uppercase mb-3" style={{ color: '#D4880A' }}>ATHLETES ON CREW</span>
-    <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-12">Already training with us.</h2>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {[
-        {
-          id: 'showcase-1',
-          name: 'Aryan',
-          city: 'Delhi',
-          area: 'South Delhi',
-          sport: '["hyrox"]',
-          level: 'intermediate',
-          bio: "Software engineer who found HYROX two years ago and hasn't looked back. Training 5 days a week, targeting sub-90 Open. Looking for someone who takes sessions seriously but keeps it fun.",
-        },
-        {
-          id: 'showcase-2',
-          name: 'Priya',
-          city: 'Mumbai',
-          area: 'Bandra',
-          sport: '["marathon"]',
-          level: 'advanced',
-          bio: "Ran my first full marathon in 4:10, targeting 3:45 at Tata Mumbai 2027. I run 70km weeks. Looking for a long-run partner who won't cancel on Sunday mornings.",
-        },
-        {
-          id: 'showcase-3',
-          name: 'Kabir',
-          city: 'Bangalore',
-          area: 'Koramangala',
-          sport: '["hyrox","marathon"]',
-          level: 'advanced',
-          bio: "Founder by day, HYROX Doubles racer by weekend. Also running TCS World 10K every year. Want someone who trains across both disciplines and understands the grind.",
-        },
-      ].map((p) => (
-        <div key={p.id} className="rounded-[20px] p-5 border flex flex-col transition-all hover:-translate-y-1"
-          style={{ background: 'rgba(42,26,69,0.80)', borderColor: 'rgba(74,61,143,0.30)' }}>
-          <div className="flex items-center gap-3 mb-3">
-            <GradientAvatar name={p.name} size={44} />
-            <div className="min-w-0">
-              <p className="font-inter font-semibold text-sm text-white">{p.name}</p>
-              <p className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                {p.city} · {p.area}
-              </p>
-            </div>
+      {/* PATCH 1: Athletes already on CREW — updated heading + disclaimer note */}
+      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#1C0A30' }}>
+        <div className="max-w-7xl mx-auto">
+          <span className="block font-inter font-semibold text-xs tracking-[0.2em] uppercase mb-3" style={{ color: '#D4880A' }}>ATHLETES ON CREW</span>
+          <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-2">Already training with us.</h2>
+          <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.6)' }}>Real profiles. Real races. Log in to connect.</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                id: 'showcase-1',
+                name: 'Aryan',
+                city: 'Delhi',
+                area: 'South Delhi',
+                sport: '["hyrox"]',
+                level: 'intermediate',
+                bio: "Software engineer who found HYROX two years ago and hasn't looked back. Training 5 days a week, targeting sub-90 Open. Looking for someone who takes sessions seriously but keeps it fun.",
+              },
+              {
+                id: 'showcase-2',
+                name: 'Priya',
+                city: 'Mumbai',
+                area: 'Bandra',
+                sport: '["marathon"]',
+                level: 'advanced',
+                bio: "Ran my first full marathon in 4:10, targeting 3:45 at Tata Mumbai 2027. I run 70km weeks. Looking for a long-run partner who won't cancel on Sunday mornings.",
+              },
+              {
+                id: 'showcase-3',
+                name: 'Kabir',
+                city: 'Bangalore',
+                area: 'Koramangala',
+                sport: '["hyrox","marathon"]',
+                level: 'advanced',
+                bio: "Founder by day, HYROX Doubles racer by weekend. Also running TCS World 10K every year. Want someone who trains across both disciplines and understands the grind.",
+              },
+            ].map((p) => (
+              <div key={p.id} className="rounded-[20px] p-5 border flex flex-col transition-all hover:-translate-y-1"
+                style={{ background: 'rgba(42,26,69,0.80)', borderColor: 'rgba(74,61,143,0.30)' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <GradientAvatar name={p.name} size={44} />
+                  <div className="min-w-0">
+                    <p className="font-inter font-semibold text-sm text-white">{p.name}</p>
+                    <p className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                      {p.city} · {p.area}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {parseSport(p.sport).filter(s => s !== 'ironman').map(s => {
+                    const b = sportBadge(s);
+                    return (
+                      <span key={s} className="px-2 py-0.5 rounded-pill text-[10px] font-inter font-bold text-white"
+                        style={{ background: b.bg }}>{b.label}</span>
+                    );
+                  })}
+                  {p.level && (
+                    <span className="px-2 py-0.5 rounded-pill text-[10px] font-inter capitalize"
+                      style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)' }}>
+                      {p.level}
+                    </span>
+                  )}
+                </div>
+                <p className="font-inter text-xs mb-3 flex-1"
+                  style={{ color: 'rgba(255,255,255,0.6)', display: '-webkit-box',
+                    WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {p.bio}
+                </p>
+                <Link to="/get-started"
+                  className="mt-auto font-inter font-semibold text-xs flex items-center gap-1"
+                  style={{ color: '#D4880A' }}>
+                  View Profile <ChevronRight size={14} />
+                </Link>
+              </div>
+            ))}
           </div>
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {parseSport(p.sport).filter(s => s !== 'ironman').map(s => {
-              const b = sportBadge(s);
-              return (
-                <span key={s} className="px-2 py-0.5 rounded-pill text-[10px] font-inter font-bold text-white"
-                  style={{ background: b.bg }}>{b.label}</span>
-              );
-            })}
-            {p.level && (
-              <span className="px-2 py-0.5 rounded-pill text-[10px] font-inter capitalize"
-                style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)' }}>
-                {p.level}
-              </span>
-            )}
-          </div>
-          <p className="font-inter text-xs mb-3 flex-1"
-            style={{ color: 'rgba(255,255,255,0.6)', display: '-webkit-box',
-              WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-            {p.bio}
-          </p>
-          <Link to="/get-started"
-            className="mt-auto font-inter font-semibold text-xs flex items-center gap-1"
-            style={{ color: '#D4880A' }}>
-            View Profile <ChevronRight size={14} />
-          </Link>
         </div>
-      ))}
-    </div>
-  </div>
-</section>
+      </section>
 
       {/* UPCOMING EVENTS */}
       <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#2A1A45' }}>
@@ -341,7 +347,8 @@ export default function Home() {
         <div className="max-w-4xl mx-auto text-center">
           <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider mb-6"
             style={{ color: '#F0A500', background: 'rgba(240,165,0,0.08)', border: '1px solid rgba(240,165,0,0.25)' }}>
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#D4880A' }} /> POWERED BY GRAPELABS <span style={{ color: '#D4880A', marginLeft: 2 }}>AI</span>
+            {/* PATCH 3: explicit space before AI span */}
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#D4880A' }} /> POWERED BY GRAPELABS{' '}<span style={{ color: '#D4880A', marginLeft: 2 }}>AI</span>
           </span>
           <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-4">
             We build the systems that run your business.
