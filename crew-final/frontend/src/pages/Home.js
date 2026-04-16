@@ -153,8 +153,7 @@ export default function Home() {
               <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider"
                 style={{ color: '#7C6FD4', background: 'rgba(124,111,212,0.10)', border: '1px solid rgba(124,111,212,0.25)' }}>
-                {/* PATCH 3: explicit space before AI span */}
-                BUILT USING AI-POWERED SYSTEMS BY GrapeLabs<span style={{ color: '#D4880A' }}>AI</span> <ExternalLink size={12} />
+                BUILT USING AI-POWERED SYSTEMS BY <span style={{ textTransform: 'none' }}>GrapeLabs</span> <span style={{ color: '#D4880A' }}>AI</span> <ExternalLink size={12} />
               </a>
             </div>
           </div>
@@ -347,8 +346,7 @@ export default function Home() {
         <div className="max-w-4xl mx-auto text-center">
           <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider mb-6"
             style={{ color: '#F0A500', background: 'rgba(240,165,0,0.08)', border: '1px solid rgba(240,165,0,0.25)' }}>
-            {/* PATCH 3: explicit space before AI span */}
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#D4880A' }} /> POWERED BY GrapeLabs<span style={{ color: '#D4880A' }}>AI</span>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#D4880A' }} /> POWERED BY <span style={{ textTransform: 'none' }}>GrapeLabs</span> <span style={{ color: '#D4880A' }}>AI</span>
           </span>
           <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-4">
             We build the systems that run your business.
