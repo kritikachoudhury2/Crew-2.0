@@ -2,15 +2,30 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { Camera, Save, Trash2, AlertTriangle } from 'lucide-react';
+import { Camera, Save, Trash2, AlertTriangle, MessageCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CITIES = ['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa', 'Chennai', 'Kolkata', 'Other'];
+const COUNTRY_CODES = ['+91', '+971', '+66', '+1', '+44', '+65'];
 const parseArr = (s) => { try { return typeof s === 'string' ? JSON.parse(s) : s || []; } catch { return []; } };
 
 function calcCompleteness(form) {
-  const fields = [form.name, form.age, form.gender, form.city, form.sport?.length, form.level, form.partner_goal];
+  const fields = [form.name, form.age, form.gender, form.city, form.sport?.length, form.level, form.partner_goal, form._phoneNumber];
   return Math.round((fields.filter(Boolean).length / fields.length) * 100);
+}
+
+// Strip country code prefix from stored phone to get bare number
+function parseStoredPhone(storedPhone) {
+  const raw = (storedPhone || '').replace(/\D/g, ''); // digits only e.g. "919810676388"
+  if (!raw) return { countryCode: '+91', phoneNumber: '' };
+  for (const code of COUNTRY_CODES) {
+    const digits = code.replace('+', '');
+    if (raw.startsWith(digits) && raw.length > digits.length) {
+      return { countryCode: code, phoneNumber: raw.slice(digits.length) };
+    }
+  }
+  // No known prefix found — assume raw is the number
+  return { countryCode: '+91', phoneNumber: raw };
 }
 
 export default function EditProfile() {
@@ -22,18 +37,7 @@ export default function EditProfile() {
 
   useEffect(() => {
     if (profile) {
-      // Extract country code and number from stored phone
-      let storedPhone = profile.phone || '';
-      let countryCode = '+91';
-      let phoneNumber = storedPhone;
-      const codes = ['+971', '+66', '+1', '+44', '+65', '+91'];
-      for (const code of codes) {
-        if (storedPhone.startsWith(code)) {
-          countryCode = code;
-          phoneNumber = storedPhone.slice(code.length);
-          break;
-        }
-      }
+      const { countryCode, phoneNumber } = parseStoredPhone(profile.phone);
       setForm({
         ...profile,
         sport: parseSportList(profile.sport),
@@ -52,6 +56,7 @@ export default function EditProfile() {
     if (!user) return;
     setSaving(true);
     const cityValue = form.city === 'Other' ? (form.city_custom || 'Other') : form.city;
+    // Store as digits only — country code digits + number digits, no + or spaces
     const fullPhone = form._phoneNumber?.trim()
       ? `${form._countryCode}${form._phoneNumber.trim()}`.replace(/\D/g, '')
       : null;
@@ -86,7 +91,7 @@ export default function EditProfile() {
     };
 
     const { error } = await supabase.from('profiles').upsert(data, { onConflict: 'id' });
-    if (error) { toast.error('Could not save your profile. Please try again.'); setSaving(false); return; }
+    if (error) { toast.error('Could not save your profile.'); setSaving(false); return; }
     await refreshProfile();
     setSaving(false);
     toast.success('Profile saved!');
@@ -112,6 +117,9 @@ export default function EditProfile() {
   };
 
   const completeness = calcCompleteness(form);
+  const whatsappNumber = form._phoneNumber?.trim()
+    ? `${form._countryCode}${form._phoneNumber.trim()}`.replace(/\D/g, '')
+    : null;
 
   return (
     <div data-testid="edit-profile-page">
@@ -119,7 +127,6 @@ export default function EditProfile() {
         <div className="max-w-lg mx-auto">
           <h1 className="font-inter font-[800] text-4xl text-white mb-2" style={{ letterSpacing: '-2px' }}>Edit Profile</h1>
 
-          {/* Profile completeness */}
           <div className="rounded-[12px] p-4 mb-8 border" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)' }}>
             <div className="flex items-center justify-between mb-2">
               <p className="font-inter text-xs font-medium text-white">Profile completeness</p>
@@ -153,7 +160,7 @@ export default function EditProfile() {
               <label className="font-inter text-xs font-medium text-white block mb-1.5">Name *</label>
               <input type="text" value={form.name || ''} onChange={e => update('name', e.target.value)}
                 className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
-                style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} data-testid="edit-name" />
+                style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -202,26 +209,38 @@ export default function EditProfile() {
                 style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
             </div>
 
-            {/* PHONE — critical for WhatsApp connections */}
+            {/* PHONE — with WhatsApp connect button */}
             <div>
               <label className="font-inter text-xs font-medium text-white block mb-1.5">
                 Phone number <span style={{ color: '#D4880A' }}>*</span>
-                <span className="ml-2 font-normal" style={{ color: 'rgba(255,255,255,0.4)' }}>Used for WhatsApp when you match</span>
+                <span className="ml-2 font-normal" style={{ color: 'rgba(255,255,255,0.4)' }}>For WhatsApp when you match</span>
               </label>
               <div className="flex gap-2">
                 <select value={form._countryCode || '+91'} onChange={e => update('_countryCode', e.target.value)}
-                  className="px-3 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
+                  className="px-3 py-3 rounded-[12px] font-inter text-sm text-white outline-none shrink-0"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
-                  {['+91', '+971', '+66', '+1', '+44', '+65'].map(c => <option key={c}>{c}</option>)}
+                  {COUNTRY_CODES.map(c => <option key={c}>{c}</option>)}
                 </select>
-                <input type="tel" value={form._phoneNumber || ''} onChange={e => update('_phoneNumber', e.target.value)}
+                {/* Value shows ONLY the number part, never the country code prefix */}
+                <input type="tel" value={form._phoneNumber || ''}
+                  onChange={e => {
+                    // Strip any digits that match the country code prefix if user pastes full number
+                    let val = e.target.value.replace(/\D/g, '');
+                    const codeDigits = (form._countryCode || '+91').replace('+', '');
+                    if (val.startsWith(codeDigits) && val.length > codeDigits.length) {
+                      val = val.slice(codeDigits.length);
+                    }
+                    update('_phoneNumber', val);
+                  }}
                   placeholder="9876543210"
+                  maxLength={12}
                   className="flex-1 px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
               </div>
               <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
                 Never shown publicly. Only used to open WhatsApp after a mutual match.
               </p>
+             
             </div>
 
             <div>
