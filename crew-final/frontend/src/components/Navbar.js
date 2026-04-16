@@ -14,13 +14,14 @@ export default function Navbar() {
   };
 
   const navLinks = [
+    { to: '/', label: 'Home' },
     { to: '/how-it-works', label: 'How It Works' },
     { to: '/find-a-partner', label: 'Find a Partner' },
     { to: '/events', label: 'Events' },
     { to: '/about', label: 'About Us' },
   ];
 
-  const isActive = (path) => location.pathname === path;
+  const isActive = (path) => path === '/' ? location.pathname === '/' : location.pathname === path;
 
   return (
     <>
@@ -30,7 +31,7 @@ export default function Navbar() {
         style={{ background: '#1C0A30', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
       >
         {/* Logo */}
-        <Link to="/" className="no-underline flex flex-col leading-none gap-0.5" data-testid="nav-logo" onClick={() => setMobileOpen(false)}>
+        <Link to="/" className="no-underline flex flex-col leading-none gap-0.5" onClick={() => setMobileOpen(false)}>
           <span className="font-inter font-[800] text-2xl tracking-tight" style={{ color: '#FFFFFF', letterSpacing: '-1px' }}>CREW</span>
           <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
             className="font-inter font-normal text-[11px] no-underline" style={{ color: '#6B5FA0' }}
@@ -54,7 +55,9 @@ export default function Navbar() {
         <div className="hidden md:flex items-center gap-4">
           {user ? (
             <div className="flex items-center gap-3">
-              <Link to="/my-connections" className="p-2 rounded-full" style={{ color: isActive('/my-connections') ? '#D4880A' : 'rgba(255,255,255,0.6)' }}>
+              <Link to="/my-connections" title="My Connections"
+                className="p-2 rounded-full transition-colors"
+                style={{ color: isActive('/my-connections') ? '#D4880A' : 'rgba(255,255,255,0.6)' }}>
                 <Users size={18} />
               </Link>
               <Link to="/profile/edit"
@@ -62,20 +65,28 @@ export default function Navbar() {
                 style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
                 {profile?.name || 'Profile'}
               </Link>
-              <button onClick={handleSignOut} className="p-2 rounded-full" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              <button onClick={handleSignOut} title="Sign out" className="p-2 rounded-full" style={{ color: 'rgba(255,255,255,0.6)' }}>
                 <LogOut size={18} />
               </button>
             </div>
           ) : (
-            <Link to="/get-started"
-              className="font-inter font-bold text-sm px-6 py-2.5 rounded-pill transition-all hover:scale-[1.02]"
-              style={{ background: '#D4880A', color: '#FFFFFF' }}>
-              Get Started
-            </Link>
+            <div className="flex items-center gap-3">
+              {/* Returning users see Log In, new users see Get Started */}
+              <Link to="/get-started?mode=login"
+                className="font-inter font-medium text-sm px-5 py-2 rounded-pill transition-all"
+                style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
+                Log In
+              </Link>
+              <Link to="/get-started"
+                className="font-inter font-bold text-sm px-6 py-2.5 rounded-pill transition-all hover:scale-[1.02]"
+                style={{ background: '#D4880A', color: '#FFFFFF' }}>
+                Get Started
+              </Link>
+            </div>
           )}
         </div>
 
-        {/* Mobile right side — connections icon + hamburger */}
+        {/* Mobile right — connections icon + hamburger */}
         <div className="flex md:hidden items-center gap-2">
           {user && (
             <Link to="/my-connections" onClick={() => setMobileOpen(false)}
@@ -84,13 +95,13 @@ export default function Navbar() {
               <Users size={22} />
             </Link>
           )}
-          <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2 z-50 relative" style={{ color: '#fff' }}>
+          <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2" style={{ color: '#fff' }}>
             {mobileOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
         </div>
       </nav>
 
-      {/* Mobile Menu overlay */}
+      {/* Mobile Menu */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-6"
           style={{ background: '#1C0A30', top: '64px' }}>
@@ -117,11 +128,17 @@ export default function Navbar() {
               </button>
             </>
           ) : (
-            <Link to="/get-started" onClick={() => setMobileOpen(false)}
-              className="font-inter font-bold text-sm px-8 py-3 rounded-pill"
-              style={{ background: '#D4880A', color: '#FFFFFF' }}>
-              Get Started
-            </Link>
+            <div className="flex flex-col items-center gap-4">
+              <Link to="/get-started?mode=login" onClick={() => setMobileOpen(false)}
+                className="font-inter font-medium text-xl" style={{ color: '#fff' }}>
+                Log In
+              </Link>
+              <Link to="/get-started" onClick={() => setMobileOpen(false)}
+                className="font-inter font-bold text-sm px-8 py-3 rounded-pill"
+                style={{ background: '#D4880A', color: '#FFFFFF' }}>
+                Get Started
+              </Link>
+            </div>
           )}
         </div>
       )}
