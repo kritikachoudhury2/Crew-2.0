@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { calcMatchScore, whyMatched, getMatchLabel, getMatchCaveat, parseSports } from '../lib/matching';
@@ -35,6 +35,7 @@ const FILTER_LEVELS = [
 
 export default function FindAPartner() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [allProfiles, setAllProfiles] = useState([]);
   const [results, setResults] = useState([]);
@@ -43,8 +44,8 @@ export default function FindAPartner() {
   const [sort, setSort] = useState('best');
   const [savedIds, setSavedIds] = useState(new Set());
   const [fetchKey, setFetchKey] = useState(0);
-  // connectionMap: { [profileId]: 'matched' | 'sent' | 'received' }
-  const [connectionMap, setConnectionMap] = useState({});
+  const [connectionStates, setConnectionStates] = useState({});
+  const [matchedPhones, setMatchedPhones] = useState({});
   const [filters, setFilters] = useState({
     sport: searchParams.get('sport') ? [searchParams.get('sport')] : [],
     city: [], level: [], gender: [],
@@ -52,32 +53,22 @@ export default function FindAPartner() {
 
   useEffect(() => {
     const fetchProfiles = async () => {
-      let data = null;
-      let lastError = null;
-
+      let data = null, lastError = null;
       for (let attempt = 0; attempt < 3; attempt++) {
         if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt));
         const result = await supabase
           .from('profiles')
-          .select('id,name,age,gender,city,area,lat,lng,sport,level,bio,photo_url,target_race,hyrox_category,hyrox_strong,hyrox_weak,hyrox_5k_time,marathon_pace,marathon_distance,marathon_weekly_km,marathon_goal,race_goal,training_days,partner_goal,partner_level_pref,partner_gender_pref,email_verified,last_active,profile_views,flagged,phone')
+          .select('id,name,age,gender,city,area,lat,lng,sport,level,bio,photo_url,phone,target_race,hyrox_category,hyrox_strong,hyrox_weak,hyrox_5k_time,marathon_pace,marathon_distance,marathon_weekly_km,marathon_goal,race_goal,training_days,partner_goal,partner_level_pref,partner_gender_pref,email_verified,last_active,profile_views,flagged')
           .neq('flagged', true)
           .neq('id', user?.id || '')
           .filter('name', 'not.is', null)
           .filter('name', 'neq', '')
           .order('last_active', { ascending: false })
           .limit(200);
-
         if (!result.error) { data = result.data; lastError = null; break; }
         lastError = result.error;
-        console.warn(`[FindAPartner] fetch attempt ${attempt + 1} failed:`, result.error.message);
       }
-
-      if (lastError) {
-        console.error('[FindAPartner] fetch error after retries:', lastError.message);
-        setAllProfiles([]);
-      } else {
-        setAllProfiles(data?.length ? data : SEED_PROFILES);
-      }
+      setAllProfiles(lastError ? [] : (data?.length ? data : SEED_PROFILES));
       setLoading(false);
     };
 
@@ -87,40 +78,31 @@ export default function FindAPartner() {
       if (data) setSavedIds(new Set(data.map(r => r.saved_user_id)));
     };
 
-    // Fetch all connection states for current user in one go
     const fetchConnectionStates = async () => {
       if (!user) return;
-      const map = {};
+      const states = {};
+      const phones = {};
 
-      // Matches
-      const { data: matches } = await supabase
-        .from('matches')
-        .select('user1_id, user2_id')
-        .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`);
-      if (matches) {
-        matches.forEach(m => {
-          const partnerId = m.user1_id === user.id ? m.user2_id : m.user1_id;
-          map[partnerId] = 'matched';
-        });
+      const [sentRes, recvRes, matchRes] = await Promise.all([
+        supabase.from('connect_requests').select('to_user_id').eq('from_user_id', user.id).eq('status', 'pending'),
+        supabase.from('connect_requests').select('from_user_id').eq('to_user_id', user.id).eq('status', 'pending'),
+        supabase.from('matches').select('user1_id, user2_id').or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`),
+      ]);
+
+      (sentRes.data || []).forEach(r => { states[r.to_user_id] = 'sent'; });
+      (recvRes.data || []).forEach(r => { states[r.from_user_id] = 'received'; });
+
+      // For matches, fetch partner phone separately to avoid RLS join issues
+      for (const m of (matchRes.data || [])) {
+        const partnerId = m.user1_id === user.id ? m.user2_id : m.user1_id;
+        states[partnerId] = 'matched';
+        // Fetch phone from profiles
+        const { data: pData } = await supabase.from('profiles').select('phone').eq('id', partnerId).single();
+        if (pData?.phone) phones[partnerId] = pData.phone;
       }
 
-      // Sent requests
-      const { data: sent } = await supabase
-        .from('connect_requests')
-        .select('to_user_id')
-        .eq('from_user_id', user.id)
-        .eq('status', 'pending');
-      if (sent) sent.forEach(r => { if (!map[r.to_user_id]) map[r.to_user_id] = 'sent'; });
-
-      // Received requests
-      const { data: received } = await supabase
-        .from('connect_requests')
-        .select('from_user_id')
-        .eq('to_user_id', user.id)
-        .eq('status', 'pending');
-      if (received) received.forEach(r => { if (!map[r.from_user_id]) map[r.from_user_id] = 'received'; });
-
-      setConnectionMap(map);
+      setConnectionStates(states);
+      setMatchedPhones(phones);
     };
 
     fetchProfiles();
@@ -130,33 +112,22 @@ export default function FindAPartner() {
 
   useEffect(() => {
     let filtered = [...allProfiles];
-    if (filters.sport.length) {
-      filtered = filtered.filter(p => {
-        const sports = parseSports(p.sport);
-        return filters.sport.some(f => sports.includes(f));
-      });
-    }
+    if (filters.sport.length) filtered = filtered.filter(p => filters.sport.some(f => parseSports(p.sport).includes(f)));
     if (filters.city.length) {
-      filtered = filtered.filter(p => {
-        const standardCities = ['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa', 'Chennai', 'Kolkata'];
-        if (filters.city.includes('Other') && !standardCities.includes(p.city)) return true;
-        return filters.city.includes(p.city);
-      });
+      const std = ['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa', 'Chennai', 'Kolkata'];
+      filtered = filtered.filter(p => (filters.city.includes('Other') && !std.includes(p.city)) || filters.city.includes(p.city));
     }
     if (filters.level.length) filtered = filtered.filter(p => filters.level.includes(p.level));
     if (filters.gender.length) filtered = filtered.filter(p => filters.gender.includes(p.gender));
 
     const viewer = profile || {};
-    const scored = filtered.map(p => {
-      const score = profile ? calcMatchScore(viewer, p) : 30;
-      return {
-        ...p,
-        matchScore: score,
-        matchWhy: profile ? whyMatched(viewer, p) : 'Complete your profile for better matches',
-        matchLabel: getMatchLabel(score),
-        matchCaveat: profile ? getMatchCaveat(viewer, p) : null,
-      };
-    }).filter(x => x.matchScore >= 0);
+    const scored = filtered.map(p => ({
+      ...p,
+      matchScore: profile ? calcMatchScore(viewer, p) : 30,
+      matchWhy: profile ? whyMatched(viewer, p) : 'Complete your profile for better matches',
+      matchLabel: getMatchLabel(profile ? calcMatchScore(viewer, p) : 30),
+      matchCaveat: profile ? getMatchCaveat(viewer, p) : null,
+    })).filter(x => x.matchScore >= 0);
 
     if (sort === 'best') scored.sort((a, b) => b.matchScore - a.matchScore);
     else if (sort === 'newest') scored.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
@@ -164,26 +135,22 @@ export default function FindAPartner() {
     setResults(scored);
   }, [allProfiles, filters, sort, profile]);
 
-  const handleConnect = async (profileId) => {
-    if (!user) return;
-    const { count } = await supabase
-      .from('connect_requests')
+  const handleConnect = async (e, profileId) => {
+    e.stopPropagation(); // prevent card navigation
+    if (!user) { toast.error('Sign in to connect'); return; }
+    const { count } = await supabase.from('connect_requests')
       .select('*', { count: 'exact', head: true })
       .eq('from_user_id', user.id)
       .gte('created_at', new Date(Date.now() - 86400000).toISOString());
-    if (count >= 10) {
-      toast.error("You've reached your daily limit of 10 connection requests.", { duration: 5000 });
-      return;
-    }
-    const { error } = await supabase.from('connect_requests').insert({
-      from_user_id: user.id, to_user_id: profileId, status: 'pending'
-    });
+    if (count >= 10) { toast.error("Daily limit of 10 requests reached."); return; }
+    const { error } = await supabase.from('connect_requests').insert({ from_user_id: user.id, to_user_id: profileId, status: 'pending' });
     if (error) { toast.error('Could not send request.'); return; }
-    setConnectionMap(prev => ({ ...prev, [profileId]: 'sent' }));
-    toast.success(`Connection request sent!`);
+    setConnectionStates(prev => ({ ...prev, [profileId]: 'sent' }));
+    toast.success('Connection request sent!');
   };
 
-  const toggleSave = async (profileId) => {
+  const toggleSave = async (e, profileId) => {
+    e.stopPropagation(); // prevent card navigation
     if (!user) { toast.error('Sign in to save profiles'); return; }
     const isSaved = savedIds.has(profileId);
     if (isSaved) {
@@ -198,12 +165,9 @@ export default function FindAPartner() {
     }
   };
 
-  const toggleFilter = (key, val) => {
-    setFilters(prev => ({
-      ...prev,
-      [key]: prev[key].includes(val) ? prev[key].filter(v => v !== val) : [...prev[key], val],
-    }));
-  };
+  const toggleFilter = (key, val) => setFilters(prev => ({
+    ...prev, [key]: prev[key].includes(val) ? prev[key].filter(v => v !== val) : [...prev[key], val],
+  }));
   const clearFilters = () => setFilters({ sport: [], city: [], level: [], gender: [] });
   const activeCount = Object.values(filters).reduce((a, b) => a + b.length, 0);
 
@@ -214,53 +178,40 @@ export default function FindAPartner() {
       const weak = parseArr(p.hyrox_weak).slice(0, 1).join(', ');
       return `${strong ? `Strong: ${strong}` : ''}${weak ? ` · Working on: ${weak}` : ''}`;
     }
-    if (sports.includes('marathon')) {
-      return `${p.marathon_pace ? `Pace: ${p.marathon_pace}/km` : ''} ${p.marathon_distance || ''} ${p.marathon_weekly_km ? `· ${p.marathon_weekly_km}` : ''}`.trim();
-    }
+    if (sports.includes('marathon')) return `${p.marathon_pace ? `Pace: ${p.marathon_pace}/km` : ''} ${p.marathon_distance || ''} ${p.marathon_weekly_km ? `· ${p.marathon_weekly_km}` : ''}`.trim();
     return '';
   };
 
-  // Render the correct action button based on connection state
   const renderConnectButton = (p) => {
-    const state = connectionMap[p.id];
-
+    const state = connectionStates[p.id];
     if (state === 'matched') {
+      const phone = (matchedPhones[p.id] || p.phone || '').replace(/\D/g, '');
       return (
-        <a
-          href={`https://wa.me/${(p.phone || '').replace(/\D/g, '')}?text=Hey!+We+matched+on+CREW+%E2%80%94+want+to+train%3F`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-1 text-center py-2 rounded-pill font-inter font-semibold text-xs flex items-center justify-center gap-1"
+        <a href={phone ? `https://wa.me/${phone}?text=Hey!+We+matched+on+CREW+%E2%80%94+want+to+train%3F` : '#'}
+          target="_blank" rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
+          className="flex-1 text-center py-2 rounded-pill font-inter font-semibold text-xs flex items-center justify-center gap-1.5"
           style={{ background: '#25D366', color: '#fff' }}>
           <MessageCircle size={12} /> Open WhatsApp
         </a>
       );
     }
-
-    if (state === 'sent') {
-      return (
-        <button disabled
-          className="flex-1 py-2 rounded-pill font-inter font-semibold text-xs opacity-70"
-          style={{ border: '2px solid #6B5FA0', color: '#fff', background: 'transparent' }}>
-          Request Sent
-        </button>
-      );
-    }
-
-    if (state === 'received') {
-      return (
-        <Link to={`/athlete/${p.id}`}
-          className="flex-1 text-center py-2 rounded-pill font-inter font-semibold text-xs"
-          style={{ background: '#4A3D8F', color: '#fff' }}>
-          Respond to Request →
-        </Link>
-      );
-    }
-
-    // Default: no connection yet
+    if (state === 'sent') return (
+      <button disabled onClick={e => e.stopPropagation()}
+        className="flex-1 py-2 rounded-pill font-inter font-semibold text-xs opacity-70"
+        style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
+        Request Sent
+      </button>
+    );
+    if (state === 'received') return (
+      <Link to="/my-connections" onClick={e => e.stopPropagation()}
+        className="flex-1 text-center py-2 rounded-pill font-inter font-semibold text-xs"
+        style={{ background: '#4A3D8F', color: '#fff' }}>
+        Respond to Request →
+      </Link>
+    );
     return (
-      <button
-        onClick={() => handleConnect(p.id)}
+      <button onClick={e => handleConnect(e, p.id)}
         className="flex-1 py-2 rounded-pill font-inter font-semibold text-xs transition-all hover:scale-[1.02]"
         style={{ background: '#D4880A', color: '#fff' }}>
         Connect <ArrowRight size={12} className="inline ml-1" />
@@ -309,11 +260,7 @@ export default function FindAPartner() {
           </label>
         ))}
       </div>
-      {activeCount > 0 && (
-        <button onClick={clearFilters} className="font-inter text-xs transition-colors hover:text-amber-brand" style={{ color: '#6B5FA0' }}>
-          Clear all filters
-        </button>
-      )}
+      {activeCount > 0 && <button onClick={clearFilters} className="font-inter text-xs" style={{ color: '#6B5FA0' }}>Clear all filters</button>}
     </div>
   );
 
@@ -326,65 +273,50 @@ export default function FindAPartner() {
           </p>
         </div>
       )}
-
       <section className="py-14 md:py-24 px-6 md:px-12 min-h-screen" style={{ background: '#1C0A30' }}>
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row gap-8">
-            {/* Desktop Filters */}
             <div className="hidden md:block w-64 shrink-0">
               <div className="sticky top-20 rounded-[20px] p-5 border" style={{ background: 'rgba(42,26,69,0.60)', borderColor: 'rgba(74,61,143,0.30)' }}>
                 <h3 className="font-inter font-bold text-sm text-white mb-4">Filter athletes</h3>
                 <FilterPanel />
               </div>
             </div>
-
-            {/* Mobile filter toggle */}
-            <button onClick={() => setShowFilters(true)} className="md:hidden flex items-center gap-2 px-4 py-2 rounded-pill font-inter text-sm self-start"
-              style={{ border: '2px solid rgba(74,61,143,0.30)', color: '#fff' }}>
+            <button onClick={() => setShowFilters(true)} className="md:hidden flex items-center gap-2 px-4 py-2 rounded-pill font-inter text-sm self-start" style={{ border: '2px solid rgba(74,61,143,0.30)', color: '#fff' }}>
               <Filter size={14} /> Filters {activeCount > 0 && `(${activeCount})`}
             </button>
-
-            {/* Results */}
             <div className="flex-1">
               <div className="flex items-center justify-between mb-6">
-                <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
-                  Showing {results.length} athletes
-                </p>
-                <select value={sort} onChange={e => setSort(e.target.value)}
-                  className="px-3 py-1.5 rounded-[8px] font-inter text-xs outline-none"
-                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)', color: '#fff' }}>
+                <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>Showing {results.length} athletes</p>
+                <select value={sort} onChange={e => setSort(e.target.value)} className="px-3 py-1.5 rounded-[8px] font-inter text-xs outline-none" style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)', color: '#fff' }}>
                   <option value="best">Best Match</option>
                   <option value="active">Most Active</option>
                   <option value="newest">Newest</option>
                 </select>
               </div>
-
               {activeCount > 0 && (
                 <div className="flex flex-wrap gap-2 mb-4">
-                  {Object.entries(filters).flatMap(([key, vals]) =>
-                    vals.map(v => (
-                      <span key={`${key}-${v}`} className="inline-flex items-center gap-1 px-3 py-1 rounded-pill font-inter text-xs"
-                        style={{ background: 'rgba(212,136,10,0.12)', color: '#F0A830', border: '1px solid rgba(212,136,10,0.25)' }}>
-                        {v} <button onClick={() => toggleFilter(key, v)}><X size={12} /></button>
-                      </span>
-                    ))
-                  )}
+                  {Object.entries(filters).flatMap(([key, vals]) => vals.map(v => (
+                    <span key={`${key}-${v}`} className="inline-flex items-center gap-1 px-3 py-1 rounded-pill font-inter text-xs" style={{ background: 'rgba(212,136,10,0.12)', color: '#F0A830', border: '1px solid rgba(212,136,10,0.25)' }}>
+                      {v} <button onClick={() => toggleFilter(key, v)}><X size={12} /></button>
+                    </span>
+                  )))}
                 </div>
               )}
-
               {loading ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {[1, 2, 3, 4].map(i => <div key={i} className="rounded-[20px] h-48 animate-pulse" style={{ background: 'rgba(42,26,69,0.40)' }} />)}
+                  {[1,2,3,4].map(i => <div key={i} className="rounded-[20px] h-48 animate-pulse" style={{ background: 'rgba(42,26,69,0.40)' }} />)}
                 </div>
               ) : results.length > 0 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {results.map(p => (
-                    <div key={p.id} className="rounded-[20px] p-5 border transition-all hover:-translate-y-1"
+                    // Entire card is clickable — navigates to profile
+                    <div key={p.id}
+                      onClick={() => navigate(`/athlete/${p.id}`)}
+                      className="rounded-[20px] p-5 border transition-all hover:-translate-y-1 cursor-pointer"
                       style={{ background: 'rgba(42,26,69,0.60)', borderColor: 'rgba(74,61,143,0.30)' }}>
                       <div className="flex items-start gap-3 mb-3">
-                        {p.photo_url
-                          ? <img src={p.photo_url} alt={p.name} className="w-12 h-12 rounded-full object-cover" />
-                          : <GradientAvatar name={p.name} size={48} />}
+                        {p.photo_url ? <img src={p.photo_url} alt={p.name} className="w-12 h-12 rounded-full object-cover" /> : <GradientAvatar name={p.name} size={48} />}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="font-inter font-semibold text-sm text-white truncate">{p.name}</p>
@@ -400,49 +332,27 @@ export default function FindAPartner() {
                           </div>
                         </div>
                       </div>
-
-                      {p.level && (
-                        <span className="inline-block px-2 py-0.5 rounded-pill text-[10px] font-inter font-medium capitalize mb-2"
-                          style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }}>
-                          {p.level}
-                        </span>
-                      )}
-
-                      {getDetailLine(p) && (
-                        <p className="font-inter text-[12px] mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>{getDetailLine(p)}</p>
-                      )}
-
+                      {p.level && <span className="inline-block px-2 py-0.5 rounded-pill text-[10px] font-inter font-medium capitalize mb-2" style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.6)' }}>{p.level}</span>}
+                      {getDetailLine(p) && <p className="font-inter text-[12px] mb-2" style={{ color: 'rgba(255,255,255,0.5)' }}>{getDetailLine(p)}</p>}
                       <div className="mb-2">
                         <div className="flex items-center gap-2 mb-1">
                           <div className="flex-1 h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.08)' }}>
                             <div className="h-full rounded-full" style={{ width: `${p.matchScore}%`, background: '#D4880A' }} />
                           </div>
-                          <span className="font-inter font-bold text-[13px] min-w-[40px] text-right" style={{ color: '#D4880A' }}>
-                            {p.matchScore}%
-                          </span>
+                          <span className="font-inter font-bold text-[13px] min-w-[40px] text-right" style={{ color: '#D4880A' }}>{p.matchScore}%</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="font-inter text-[11px]" style={{ color: 'rgba(255,255,255,0.5)' }}>{p.matchLabel}</span>
-                          <span className="font-inter text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>
-                            <Eye size={10} className="inline mr-1" />{p.profile_views || 0} views
-                          </span>
+                          <span className="font-inter text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}><Eye size={10} className="inline mr-1" />{p.profile_views || 0} views</span>
                         </div>
                       </div>
-
                       <p className="font-inter text-[11px] mb-1" style={{ color: '#A89CC8' }}>{p.matchWhy}</p>
-                      {p.matchCaveat && (
-                        <p className="font-inter text-[11px] mb-3" style={{ color: 'rgba(255,255,255,0.45)', fontStyle: 'italic' }}>{p.matchCaveat}</p>
-                      )}
-
+                      {p.matchCaveat && <p className="font-inter text-[11px] mb-3" style={{ color: 'rgba(255,255,255,0.45)', fontStyle: 'italic' }}>{p.matchCaveat}</p>}
                       <div className="flex gap-2">
                         {renderConnectButton(p)}
-                        <button onClick={() => toggleSave(p.id)}
+                        <button onClick={e => toggleSave(e, p.id)}
                           className="px-3 py-2 rounded-pill transition-colors"
-                          style={{
-                            border: '2px solid rgba(74,61,143,0.30)',
-                            color: savedIds.has(p.id) ? '#D4880A' : 'rgba(255,255,255,0.5)',
-                            background: savedIds.has(p.id) ? 'rgba(212,136,10,0.10)' : 'transparent',
-                          }}
+                          style={{ border: '2px solid rgba(74,61,143,0.30)', color: savedIds.has(p.id) ? '#D4880A' : 'rgba(255,255,255,0.5)', background: savedIds.has(p.id) ? 'rgba(212,136,10,0.10)' : 'transparent' }}
                           title={savedIds.has(p.id) ? 'Remove from saved' : 'Save profile'}>
                           <Heart size={14} fill={savedIds.has(p.id) ? '#D4880A' : 'none'} />
                         </button>
@@ -455,23 +365,14 @@ export default function FindAPartner() {
                   {allProfiles.length === 0 && !loading ? (
                     <>
                       <p className="font-inter text-lg font-semibold text-white mb-2">No athletes found.</p>
-                      <p className="font-inter text-sm mb-4" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                        This might be a temporary connection issue.
-                      </p>
-                      <button
-                        onClick={() => { setLoading(true); setAllProfiles([]); setFetchKey(k => k + 1); }}
-                        className="font-inter text-sm font-semibold px-5 py-2 rounded-pill"
-                        style={{ background: '#D4880A', color: '#fff' }}>
-                        Try Again
-                      </button>
+                      <p className="font-inter text-sm mb-4" style={{ color: 'rgba(255,255,255,0.5)' }}>This might be a temporary connection issue.</p>
+                      <button onClick={() => { setLoading(true); setAllProfiles([]); setFetchKey(k => k + 1); }} className="font-inter text-sm font-semibold px-5 py-2 rounded-pill" style={{ background: '#D4880A', color: '#fff' }}>Try Again</button>
                     </>
                   ) : (
                     <>
                       <p className="font-inter text-sm text-white mb-2">No athletes match these filters.</p>
                       <p className="font-inter text-xs mb-4" style={{ color: 'rgba(255,255,255,0.5)' }}>Try widening your search.</p>
-                      <button onClick={clearFilters} className="font-inter text-xs font-semibold" style={{ color: '#D4880A' }}>
-                        Clear Filters
-                      </button>
+                      <button onClick={clearFilters} className="font-inter text-xs font-semibold" style={{ color: '#D4880A' }}>Clear Filters</button>
                     </>
                   )}
                 </div>
@@ -480,8 +381,6 @@ export default function FindAPartner() {
           </div>
         </div>
       </section>
-
-      {/* Mobile Filters Drawer */}
       {showFilters && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowFilters(false)} />
@@ -491,11 +390,7 @@ export default function FindAPartner() {
               <button onClick={() => setShowFilters(false)}><X size={22} className="text-white" /></button>
             </div>
             <FilterPanel />
-            <button onClick={() => setShowFilters(false)}
-              className="w-full mt-8 py-3 rounded-pill font-inter font-bold text-sm"
-              style={{ background: '#D4880A', color: '#fff' }}>
-              Apply Filters
-            </button>
+            <button onClick={() => setShowFilters(false)} className="w-full mt-8 py-3 rounded-pill font-inter font-bold text-sm" style={{ background: '#D4880A', color: '#fff' }}>Apply Filters</button>
           </div>
         </div>
       )}
