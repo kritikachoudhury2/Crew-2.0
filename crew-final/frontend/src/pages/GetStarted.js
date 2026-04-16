@@ -191,6 +191,7 @@ export default function GetStarted() {
     if (idx > 0) setStep(seq[idx - 1]);
   };
 
+  // FIX 1: saves phone to localStorage immediately so it survives the magic link redirect
   const handleSendMagicLink = async () => {
     if (!email) { setError('Email is required'); return; }
     setLoading(true); setError('');
@@ -200,7 +201,18 @@ export default function GetStarted() {
         options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       });
       if (authErr) throw authErr;
-      setAnswers(prev => ({ ...prev, phone: `${countryCode}${phone}` }));
+      const fullPhone = phone?.trim() ? `${countryCode}${phone.trim()}`.replace(/\D/g, '') : null;
+      if (fullPhone) {
+        setAnswers(prev => {
+          const updated = { ...prev, phone: fullPhone };
+          // Save immediately to localStorage so it survives the magic link redirect
+          localStorage.setItem('crew-onboarding-progress', JSON.stringify({
+            step: 'sport-select',
+            answers: updated,
+          }));
+          return updated;
+        });
+      }
       setEmailSent(true);
     } catch (e) {
       setError(e.message || 'Failed to send verification email');
@@ -258,7 +270,10 @@ export default function GetStarted() {
       partner_goal: answers.hyrox_partner_goal || answers.marathon_partner_goal || answers.partner_goal || null,
       partner_level_pref: answers.hyrox_partner_level_pref || answers.marathon_partner_level_pref || answers.partner_level_pref || null,
       partner_gender_pref: answers.hyrox_partner_gender_pref || answers.marathon_partner_gender_pref || answers.partner_gender_pref || null,
-      phone: answers.phone || (phone ? `${countryCode}${phone}` : null),
+      // FIX 2: strip non-digits from stored phone; fall back to current inputs if answers.phone is empty
+      phone: answers.phone
+        ? answers.phone.replace(/\D/g, '')
+        : (phone?.trim() ? `${countryCode}${phone.trim()}`.replace(/\D/g, '') : null),
       instagram: answers.instagram || null,
       flagged: false,
       last_active: new Date().toISOString(),
