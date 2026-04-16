@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
-import { MessageCircle, Check, X, Trash2 } from 'lucide-react';
+import { MessageCircle, Check, X, Trash2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 function GradientAvatar({ name, size = 44 }) {
@@ -20,6 +20,30 @@ function GradientAvatar({ name, size = 44 }) {
 const parseSport = (s) => { try { return typeof s === 'string' ? JSON.parse(s) : s || []; } catch { return [s]; } };
 const sportBadge = (s) => ({ hyrox: { bg: '#4A3D8F', l: 'HYROX' }, marathon: { bg: '#D4880A', l: 'MARATHON' } }[s] || { bg: '#4A3D8F', l: s?.toUpperCase() });
 
+const WHATSAPP_MSG = encodeURIComponent("Hey! We matched on CREW. Looks like we’re training for similar goals. Want to connect?");
+
+function WhatsAppButton({ phone, name }) {
+  const clean = (phone || '').replace(/\D/g, '');
+  if (!clean) {
+    return (
+      <button
+        onClick={() => toast.error(`${name || 'Your match'} hasn't added their phone number yet.`)}
+        className="px-3 py-2 rounded-pill font-inter font-semibold text-xs flex items-center gap-1.5 shrink-0"
+        style={{ background: '#25D366', color: '#fff' }}>
+        <MessageCircle size={13} /> WhatsApp
+      </button>
+    );
+  }
+  return (
+    <a href={`https://wa.me/${clean}?text=${WHATSAPP_MSG}`}
+      target="_blank" rel="noopener noreferrer"
+      className="px-3 py-2 rounded-pill font-inter font-semibold text-xs flex items-center gap-1.5 shrink-0"
+      style={{ background: '#25D366', color: '#fff' }}>
+      <MessageCircle size={13} /> WhatsApp
+    </a>
+  );
+}
+
 export default function MyConnections() {
   const { user } = useAuth();
   const [tab, setTab] = useState('matches');
@@ -34,7 +58,6 @@ export default function MyConnections() {
     if (!user) return;
     setLoading(true);
 
-    // Fetch matches separately to avoid RLS issues with joined queries
     const { data: matchRows, error: matchErr } = await supabase
       .from('matches')
       .select('id, created_at, user1_id, user2_id')
@@ -42,7 +65,6 @@ export default function MyConnections() {
 
     if (matchErr) console.error('[MyConnections] matches error:', matchErr.message);
 
-    // For each match, fetch the partner profile separately
     const matchesWithPartners = await Promise.all(
       (matchRows || []).map(async (m) => {
         const partnerId = m.user1_id === user.id ? m.user2_id : m.user1_id;
@@ -134,25 +156,31 @@ export default function MyConnections() {
     { id: 'saved', label: 'Saved', count: saved.length },
   ];
 
+  // FIXED: card layout — avatar + info stacked vertically on mobile,
+  // action button always on its own row to prevent overlap
   const ProfileCard = ({ p, actions }) => (
-    <div className="rounded-[16px] p-4 border flex items-center gap-3"
+    <div className="rounded-[16px] p-4 border"
       style={{ background: 'rgba(42,26,69,0.60)', borderColor: 'rgba(74,61,143,0.30)' }}>
-      {p?.photo_url
-        ? <img src={p.photo_url} alt={p.name} className="w-11 h-11 rounded-full object-cover" />
-        : <GradientAvatar name={p?.name} />}
-      <div className="flex-1 min-w-0">
-        <Link to={`/athlete/${p?.id}`} className="font-inter font-semibold text-sm text-white truncate block">
-          {p?.name || 'Unknown'}
-        </Link>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          {parseSport(p?.sport).filter(s => s !== 'ironman').map(s => {
-            const b = sportBadge(s);
-            return <span key={s} className="px-1.5 py-0.5 rounded-pill text-[9px] font-inter font-bold text-white" style={{ background: b.bg }}>{b.l}</span>;
-          })}
-          <span className="font-inter text-[10px]" style={{ color: 'rgba(255,255,255,0.4)' }}>{p?.city}</span>
+      <div className="flex items-center gap-3">
+        {p?.photo_url
+          ? <img src={p.photo_url} alt={p.name} className="w-11 h-11 rounded-full object-cover shrink-0" />
+          : <GradientAvatar name={p?.name} />}
+        <div className="flex-1 min-w-0">
+          <Link to={`/athlete/${p?.id}`} className="font-inter font-semibold text-sm text-white block truncate">
+            {p?.name || 'Unknown'}
+          </Link>
+          <div className="flex flex-wrap items-center gap-1 mt-0.5">
+            {parseSport(p?.sport).filter(s => s !== 'ironman').map(s => {
+              const b = sportBadge(s);
+              return <span key={s} className="px-1.5 py-0.5 rounded-pill text-[9px] font-inter font-bold text-white shrink-0" style={{ background: b.bg }}>{b.l}</span>;
+            })}
+            {/* City on its own line to avoid overlap with action buttons */}
+            <span className="font-inter text-[10px] w-full mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{p?.city}</span>
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 shrink-0">{actions}</div>
+      {/* Actions always on their own row — no overlap possible */}
+      <div className="flex items-center gap-2 mt-3 justify-end">{actions}</div>
     </div>
   );
 
@@ -163,13 +191,9 @@ export default function MyConnections() {
       <section className="py-14 md:py-24 px-6 md:px-12 min-h-screen" style={{ background: '#1C0A30' }}>
         <div className="max-w-3xl mx-auto">
           <h1 className="font-inter font-[800] text-4xl text-white mb-2" style={{ letterSpacing: '-2px' }}>My Connections</h1>
-          <div className="flex items-center gap-3 mb-8">
+
+          <div className="flex items-center gap-3 mb-4">
             <p className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>{dailyCount} of 10 daily requests used</p>
-            {dailyRemaining <= 3 && dailyRemaining > 0 && (
-              <span className="px-2 py-0.5 rounded-pill font-inter text-[10px] font-medium" style={{ background: 'rgba(212,136,10,0.15)', color: '#F0A830' }}>
-                {dailyRemaining} requests remaining today
-              </span>
-            )}
             {dailyRemaining === 0 && (
               <span className="px-2 py-0.5 rounded-pill font-inter text-[10px] font-medium" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>
                 Daily limit reached. Resets in 24 hours.
@@ -177,7 +201,16 @@ export default function MyConnections() {
             )}
           </div>
 
-          <div className="flex gap-2 mb-8 overflow-x-auto">
+          {/* Privacy banner */}
+          <div className="rounded-[12px] p-3 mb-6 flex items-start gap-2"
+            style={{ background: 'rgba(74,61,143,0.20)', border: '1px solid rgba(74,61,143,0.30)' }}>
+            <ShieldCheck size={15} className="shrink-0 mt-0.5" style={{ color: '#A89CC8' }} />
+            <p className="font-inter text-[11px]" style={{ color: '#A89CC8' }}>
+              Your phone number is never shared publicly. WhatsApp opens only after both athletes accept each other's request — until then, your contact details remain completely private.
+            </p>
+          </div>
+
+          <div className="flex gap-2 mb-8 overflow-x-auto pb-1">
             {tabs.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)}
                 className="px-4 py-2 rounded-pill font-inter font-medium text-sm whitespace-nowrap transition-all"
@@ -185,46 +218,58 @@ export default function MyConnections() {
                   background: tab === t.id ? '#D4880A' : 'transparent',
                   color: tab === t.id ? '#fff' : 'rgba(255,255,255,0.6)',
                   border: tab === t.id ? '2px solid #D4880A' : '2px solid rgba(74,61,143,0.30)',
-                }}
-                data-testid={`tab-${t.id}`}>
+                }}>
                 {t.label} {t.count > 0 && <span className="ml-1.5 text-[10px]">({t.count})</span>}
               </button>
             ))}
           </div>
 
           {loading ? (
-            <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-16 rounded-[16px] animate-pulse" style={{ background: 'rgba(42,26,69,0.40)' }} />)}</div>
+            <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-[16px] animate-pulse" style={{ background: 'rgba(42,26,69,0.40)' }} />)}</div>
           ) : (
             <div className="space-y-3">
               {tab === 'matches' && (matches.length > 0 ? matches.map(m => (
                 <ProfileCard key={m.id} p={m.partner} actions={
-                  <a href={`https://wa.me/${(m.partner?.phone || '').replace(/\D/g, '')}?text=Hey!+We+matched+on+CREW+%E2%80%94+want+to+train%3F`}
-                    target="_blank" rel="noopener noreferrer"
-                    className="px-4 py-2 rounded-pill font-inter font-semibold text-xs flex items-center gap-1.5"
-                    style={{ background: '#25D366', color: '#fff' }}>
-                    <MessageCircle size={14} /> WhatsApp
-                  </a>
+                  <WhatsAppButton phone={m.partner?.phone} name={m.partner?.name} />
                 } />
               )) : <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>No matches yet. Start connecting!</p>)}
 
               {tab === 'received' && (recvReqs.length > 0 ? recvReqs.map(r => (
                 <ProfileCard key={r.id} p={r.from_profile} actions={<>
-                  <button onClick={() => handleAccept(r)} className="px-3 py-1.5 rounded-pill font-inter font-semibold text-xs" style={{ background: '#D4880A', color: '#fff' }} data-testid={`accept-${r.id}`}><Check size={14} /></button>
-                  <button onClick={() => handleDecline(r)} className="px-3 py-1.5 rounded-pill font-inter text-xs" style={{ border: '2px solid rgba(74,61,143,0.30)', color: 'rgba(255,255,255,0.5)' }} data-testid={`decline-${r.id}`}><X size={14} /></button>
+                  <button onClick={() => handleAccept(r)}
+                    className="px-4 py-2 rounded-pill font-inter font-semibold text-xs flex items-center gap-1"
+                    style={{ background: '#D4880A', color: '#fff' }}>
+                    <Check size={13} /> Accept
+                  </button>
+                  <button onClick={() => handleDecline(r)}
+                    className="px-3 py-2 rounded-pill font-inter text-xs"
+                    style={{ border: '2px solid rgba(74,61,143,0.30)', color: 'rgba(255,255,255,0.5)' }}>
+                    <X size={13} />
+                  </button>
                 </>} />
               )) : <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>No pending requests.</p>)}
 
               {tab === 'sent' && (sentReqs.length > 0 ? sentReqs.map(r => (
                 <ProfileCard key={r.id} p={r.to_profile} actions={
-                  <button onClick={() => handleWithdraw(r)} className="font-inter text-xs flex items-center gap-1" style={{ color: 'rgba(255,255,255,0.4)' }} data-testid={`withdraw-${r.id}`}><Trash2 size={12} /> Withdraw</button>
+                  <button onClick={() => handleWithdraw(r)}
+                    className="font-inter text-xs flex items-center gap-1"
+                    style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    <Trash2 size={12} /> Withdraw
+                  </button>
                 } />
               )) : <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>No sent requests.</p>)}
 
               {tab === 'saved' && (saved.length > 0 ? saved.map(s => (
                 <ProfileCard key={s.id} p={s.saved} actions={
                   <div className="flex gap-2">
-                    <Link to={`/athlete/${s.saved?.id}`} className="px-3 py-1.5 rounded-pill font-inter font-semibold text-xs" style={{ background: '#D4880A', color: '#fff' }}>View</Link>
-                    <button onClick={() => handleUnsave(s.saved?.id)} className="px-3 py-1.5 rounded-pill font-inter text-xs" style={{ border: '2px solid rgba(74,61,143,0.30)', color: 'rgba(255,255,255,0.5)' }}><X size={12} /></button>
+                    <Link to={`/athlete/${s.saved?.id}`}
+                      className="px-3 py-2 rounded-pill font-inter font-semibold text-xs"
+                      style={{ background: '#D4880A', color: '#fff' }}>View</Link>
+                    <button onClick={() => handleUnsave(s.saved?.id)}
+                      className="px-3 py-2 rounded-pill font-inter text-xs"
+                      style={{ border: '2px solid rgba(74,61,143,0.30)', color: 'rgba(255,255,255,0.5)' }}>
+                      <X size={12} />
+                    </button>
                   </div>
                 } />
               )) : <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>No saved profiles.</p>)}
