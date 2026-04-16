@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { ArrowLeft, ArrowRight, MapPin, Check } from 'lucide-react';
@@ -73,11 +73,11 @@ function NavButtons({ onBack, onNext, disabled, nextLabel = 'Next', showBack = t
 export default function GetStarted() {
   const { user, session, refreshProfile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams(); // PATCH 1
   const [step, setStep] = useState('loading');
   const [answers, setAnswers] = useState({});
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [countryCode, setCountryCode] = useState('+91');
+  // PATCH 2: phone/countryCode state removed — phone is now collected in profile-details step
   const [emailSent, setEmailSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -142,7 +142,7 @@ export default function GetStarted() {
 
     const serialized = {};
     Object.entries(data).forEach(([key, val]) => {
-      if (key.startsWith('_')) return; // FIX 1: skip internal UI-only fields
+      if (key.startsWith('_')) return; // skip internal UI-only fields
       if (val === undefined || val === null || val === '') return;
       if (Array.isArray(val) && val.length === 0) return;
       if (key === 'sport' || key === 'hyrox_strong' || key === 'hyrox_weak') {
@@ -192,7 +192,7 @@ export default function GetStarted() {
     if (idx > 0) setStep(seq[idx - 1]);
   };
 
-  // FIX 1: saves phone to localStorage immediately so it survives the magic link redirect
+  // PATCH 2: phone removed from handleSendMagicLink — collected in profile-details instead
   const handleSendMagicLink = async () => {
     if (!email) { setError('Email is required'); return; }
     setLoading(true); setError('');
@@ -202,18 +202,6 @@ export default function GetStarted() {
         options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       });
       if (authErr) throw authErr;
-      const fullPhone = phone?.trim() ? `${countryCode}${phone.trim()}`.replace(/\D/g, '') : null;
-      if (fullPhone) {
-        setAnswers(prev => {
-          const updated = { ...prev, phone: fullPhone };
-          // Save immediately to localStorage so it survives the magic link redirect
-          localStorage.setItem('crew-onboarding-progress', JSON.stringify({
-            step: 'sport-select',
-            answers: updated,
-          }));
-          return updated;
-        });
-      }
       setEmailSent(true);
     } catch (e) {
       setError(e.message || 'Failed to send verification email');
@@ -236,7 +224,6 @@ export default function GetStarted() {
       lat: answers.lat || null,
       lng: answers.lng || null,
       sport: Array.isArray(answers.sport) ? JSON.stringify(answers.sport) : answers.sport,
-      // Generic level — last sport answered wins, but sport-specific ones are preserved below
       level: answers.level || null,
       bio: answers.bio || null,
       photo_url: answers.photo_url || null,
@@ -264,14 +251,14 @@ export default function GetStarted() {
       marathon_pace: answers.marathon_pace || null,
       marathon_weekly_km: answers.marathon_weekly_km || null,
       marathon_goal: answers.marathon_goal || null,
-      // Shared fallbacks for single-sport users
+      // Shared fallbacks
       target_race: answers.hyrox_target_race || answers.marathon_target_race || answers.target_race || null,
       race_goal: answers.hyrox_race_goal || answers.marathon_goal || answers.race_goal || null,
       training_days: answers.hyrox_training_days || answers.marathon_training_days || answers.training_days || null,
       partner_goal: answers.hyrox_partner_goal || answers.marathon_partner_goal || answers.partner_goal || null,
       partner_level_pref: answers.hyrox_partner_level_pref || answers.marathon_partner_level_pref || answers.partner_level_pref || null,
       partner_gender_pref: answers.hyrox_partner_gender_pref || answers.marathon_partner_gender_pref || answers.partner_gender_pref || null,
-      // FIX 2: use _phoneNumber/_countryCode from answers (set in profile-details step), fall back to answers.phone
+      // PATCH 4: use _phoneNumber/_countryCode collected in profile-details step
       phone: answers._phoneNumber?.trim()
         ? `${answers._countryCode || '+91'}${answers._phoneNumber.trim()}`.replace(/\D/g, '')
         : (answers.phone ? answers.phone.replace(/\D/g, '') : null),
@@ -367,13 +354,22 @@ export default function GetStarted() {
   const renderStep = () => {
     switch (step) {
 
+      // ── AUTH ──────────────────────────────────────────────────────────────
       case 'auth':
         return (
           <div className="max-w-md mx-auto">
-            <h2 className="font-inter font-[800] text-3xl text-white mb-2">Let's get you set up.</h2>
-            <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.6)' }}>Create your profile and find your training partners.</p>
+            {/* PATCH 1: heading + subheading differ for login vs new user */}
+            <h2 className="font-inter font-[800] text-3xl text-white mb-2">
+              {searchParams.get('mode') === 'login' ? 'Welcome back.' : "Let's get you set up."}
+            </h2>
+            <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.6)' }}>
+              {searchParams.get('mode') === 'login'
+                ? 'Sign in via email to access your profile and matches.'
+                : 'Create your profile and find your training partners.'}
+            </p>
             {!emailSent ? (
               <>
+                {/* PATCH 2: phone fields removed from auth step entirely */}
                 <div className="space-y-4 mb-6">
                   <div>
                     <label className="font-inter text-xs font-medium text-white block mb-1.5">Email address</label>
@@ -383,20 +379,6 @@ export default function GetStarted() {
                       className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
                       style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
                     <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>We'll send you a sign-in link.</p>
-                  </div>
-                  <div>
-                    <label className="font-inter text-xs font-medium text-white block mb-1.5">Phone number</label>
-                    <div className="flex gap-2">
-                      <select value={countryCode} onChange={e => setCountryCode(e.target.value)}
-                        className="px-3 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
-                        style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
-                        {['+91', '+971', '+66', '+1', '+44', '+65'].map(c => <option key={c}>{c}</option>)}
-                      </select>
-                      <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="9876543210"
-                        className="flex-1 px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
-                        style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
-                    </div>
-                    <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>Used to open WhatsApp when you connect with someone.</p>
                   </div>
                 </div>
                 {error && <p className="font-inter text-xs mb-4" style={{ color: '#ef4444' }}>{error}</p>}
@@ -420,6 +402,7 @@ export default function GetStarted() {
           </div>
         );
 
+      // ── SPORT SELECT ──────────────────────────────────────────────────────
       case 'sport-select':
         return (
           <div className="max-w-md mx-auto">
@@ -455,8 +438,11 @@ export default function GetStarted() {
             <p className="font-inter text-xs mb-2" style={{ color: '#D4880A' }}>HYROX — 1 of 3</p>
             <h2 className="font-inter font-[800] text-3xl text-white mb-6">Your race.</h2>
             <div className="space-y-6">
+              {/* PATCH 5: label changed to required, * added */}
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Which race are you targeting? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span></label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">
+                  Which race are you targeting? <span style={{ color: '#D4880A' }}>*</span>
+                </label>
                 <select value={answers.hyrox_target_race || ''}
                   onChange={e => { update('hyrox_target_race', e.target.value); update('target_race', e.target.value); }}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
@@ -497,7 +483,10 @@ export default function GetStarted() {
               </div>
             </div>
             {validationError && <p className="font-inter text-sm mt-4" style={{ color: '#ef4444' }}>⚠ {validationError}</p>}
-            <NavButtons onBack={goBack} onNext={goNextValidated} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            {/* PATCH 5: disabled when no target race selected */}
+            <NavButtons onBack={goBack} onNext={goNextValidated}
+              disabled={submitting || !answers.hyrox_target_race}
+              nextLabel={submitting ? 'Saving...' : 'Next'} />
           </div>
         );
 
@@ -639,9 +628,10 @@ export default function GetStarted() {
                   ))}
                 </div>
               </div>
+              {/* PATCH 6: label changed to required, optional span removed */}
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">
-                  Target race <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
+                  Target race <span style={{ color: '#D4880A' }}>*</span>
                 </label>
                 <select value={answers.marathon_target_race || ''}
                   onChange={e => { update('marathon_target_race', e.target.value); if (!answers.hyrox_target_race) update('target_race', e.target.value); }}
@@ -668,7 +658,10 @@ export default function GetStarted() {
               </div>
             </div>
             {validationError && <p className="font-inter text-sm mt-4" style={{ color: '#ef4444' }}>⚠ {validationError}</p>}
-            <NavButtons onBack={goBack} onNext={goNextValidated} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
+            {/* PATCH 6: disabled when no target race selected */}
+            <NavButtons onBack={goBack} onNext={goNextValidated}
+              disabled={submitting || !answers.marathon_target_race}
+              nextLabel={submitting ? 'Saving...' : 'Next'} />
           </div>
         );
 
@@ -806,24 +799,35 @@ export default function GetStarted() {
                   selected={answers.gender} multi={false}
                   onToggle={v => update('gender', v)} />
               </div>
-              {/* FIX 3: Phone moved above Bio */}
+
+              {/* PATCH 3: Phone field placed after gender, marked required */}
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-1.5">
-                  Phone number <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
+                  Phone number <span style={{ color: '#D4880A' }}>*</span>
+                  <span className="ml-2 font-normal" style={{ color: 'rgba(255,255,255,0.4)' }}>For WhatsApp when you match</span>
                 </label>
                 <div className="flex gap-2">
                   <select value={answers._countryCode || '+91'} onChange={e => update('_countryCode', e.target.value)}
-                    className="px-3 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
+                    className="px-3 py-3 rounded-[12px] font-inter text-sm text-white outline-none shrink-0"
                     style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
                     {['+91', '+971', '+66', '+1', '+44', '+65'].map(c => <option key={c}>{c}</option>)}
                   </select>
-                  <input type="tel" value={answers._phoneNumber || ''} onChange={e => update('_phoneNumber', e.target.value)}
-                    placeholder="9876543210"
+                  <input type="tel" value={answers._phoneNumber || ''}
+                    onChange={e => {
+                      let val = e.target.value.replace(/\D/g, '');
+                      const codeDigits = (answers._countryCode || '+91').replace('+', '');
+                      if (val.startsWith(codeDigits) && val.length > codeDigits.length) val = val.slice(codeDigits.length);
+                      update('_phoneNumber', val);
+                    }}
+                    placeholder="9876543210" maxLength={12}
                     className="flex-1 px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
                     style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
                 </div>
-                <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>Used to open WhatsApp when you connect with someone.</p>
+                <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                  Never shown publicly. Only used after a mutual match.
+                </p>
               </div>
+
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-1.5">
                   Bio <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
@@ -854,8 +858,9 @@ export default function GetStarted() {
                 style={{ border: '2px solid rgba(74,61,143,0.30)', color: '#fff' }}>
                 <ArrowLeft size={16} />
               </button>
+              {/* Phone is required: !answers._phoneNumber?.trim() added to disabled condition */}
               <button onClick={() => goNext()}
-                disabled={!answers.name?.trim() || !answers.age || !answers.gender || submitting}
+                disabled={!answers.name?.trim() || !answers.age || !answers.gender || !answers._phoneNumber?.trim() || submitting}
                 className="flex-1 py-3 rounded-full font-inter font-bold text-sm disabled:opacity-30"
                 style={{ background: '#D4880A', color: '#fff' }}>
                 {submitting ? 'Saving...' : 'Next →'}
@@ -937,6 +942,7 @@ export default function GetStarted() {
           </div>
         );
 
+      // ── DONE ──────────────────────────────────────────────────────────────
       case 'done':
         return (
           <div className="max-w-md mx-auto text-center">
