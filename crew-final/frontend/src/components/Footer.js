@@ -20,7 +20,7 @@ export default function Footer() {
       style={{ background: '#1C0A30', borderTop: '1px solid rgba(74,61,143,0.20)' }}
     >
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-12">
           <div className="md:col-span-2">
             <CrewLogo />
             <p className="mt-4 font-inter text-sm" style={{ color: 'rgba(255,255,255,0.6)' }}>
@@ -46,6 +46,20 @@ export default function Footer() {
           </div>
 
           <div>
+            <h4 className="font-inter font-semibold text-sm mb-4" style={{ color: '#fff' }}>Legal</h4>
+            <div className="flex flex-col gap-3">
+              <Link to="/privacy-policy" className="font-inter text-sm transition-colors hover:text-amber-brand"
+                style={{ color: 'rgba(255,255,255,0.5)' }}>
+                Privacy Policy
+              </Link>
+              <Link to="/terms" className="font-inter text-sm transition-colors hover:text-amber-brand"
+                style={{ color: 'rgba(255,255,255,0.5)' }}>
+                Terms &amp; Conditions
+              </Link>
+            </div>
+          </div>
+
+          <div>
             <h4 className="font-inter font-semibold text-sm mb-4" style={{ color: '#fff' }}>Contact Us</h4>
             <div className="flex flex-col gap-3">
               <a href="https://wa.me/918388892300" target="_blank" rel="noopener noreferrer"
@@ -65,16 +79,6 @@ export default function Footer() {
                 <MapPin size={13} style={{ color: '#6B5FA0', flexShrink: 0, marginTop: 2 }} />
                 Green Park Extension, New Delhi 110016
               </p>
-              <div className="pt-1 border-t" style={{ borderColor: 'rgba(74,61,143,0.20)' }}>
-                <Link to="/privacy-policy" className="font-inter text-sm block mb-2 transition-colors hover:text-amber-brand"
-                  style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  Privacy Policy
-                </Link>
-                <Link to="/terms" className="font-inter text-sm block transition-colors hover:text-amber-brand"
-                  style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  Terms &amp; Conditions
-                </Link>
-              </div>
             </div>
           </div>
         </div>
