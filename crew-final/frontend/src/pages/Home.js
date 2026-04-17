@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Zap, ChevronRight, ExternalLink } from 'lucide-react';
+import { ArrowRight, ChevronRight, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 function GradientAvatar({ name, size = 48 }) {
@@ -116,10 +116,10 @@ export default function Home() {
               Find your people.<br />Race your best.
             </h1>
             <p className="font-inter text-base md:text-lg mb-8 max-w-[480px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.7)' }}>
-              Connect with HYROX and Marathon athletes who train at your level, chase the same race, and show up like you do. Train smarter, push harder, and stay race-ready together.
+              Connect with HYROX and Marathon athletes who train at your level, chase the same race, and show up like you do.
             </p>
 
-            {/* FIX 1: Full-width stacked buttons on mobile, inline on sm+ */}
+            {/* Buttons — full width on mobile, auto on sm+ */}
             <div className="flex flex-col sm:flex-row gap-3 mb-8">
               <Link to="/get-started"
                 className="flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02]"
@@ -133,14 +133,14 @@ export default function Home() {
               </Link>
             </div>
 
-            {/* FIX 2: Stats centered on mobile */}
-            <div className="flex items-center justify-center sm:justify-start gap-0">
-              <div className="flex flex-col items-center sm:items-start">
+            {/* Stats — always centered on all screen sizes */}
+            <div className="flex items-center justify-center gap-0">
+              <div className="flex flex-col items-center">
                 <span className="font-inter font-bold text-2xl text-white leading-tight">500+</span>
                 <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Athletes matched</span>
               </div>
               <div className="mx-5 self-stretch" style={{ width: '1px', background: 'rgba(255,255,255,0.15)' }} />
-              <div className="flex flex-col items-center sm:items-start">
+              <div className="flex flex-col items-center">
                 <span className="font-inter font-bold text-2xl text-white leading-tight">2</span>
                 <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Sports</span>
               </div>
@@ -148,21 +148,18 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col gap-4 lg:pt-8">
-            {/* Inline header with divider */}
+            {/* WHAT TO EXPECT — yellow line only, no trailing text */}
             <div className="flex items-center gap-2 mb-1">
               <span className="font-inter font-semibold text-[10px] tracking-[0.18em] uppercase shrink-0" style={{ color: '#D4880A' }}>
                 WHAT TO EXPECT
               </span>
               <div className="flex-1 h-px" style={{ background: 'rgba(212,136,10,0.25)' }} />
-              <span className="font-inter text-[10px] shrink-0" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                sign up to see real matches near you
-              </span>
             </div>
             <HeroProfileCard name="Arjun M." city="Delhi" sport="HYROX" matchPct={87} delay={0.1} />
             <HeroProfileCard name="Ayesha N." city="Bangalore" sport="Marathon" matchPct={74} delay={0.25} />
             <HeroProfileCard name="Vikram T." city="Mumbai" sport="HYROX + Marathon" matchPct={68} delay={0.4} />
 
-            {/* FIX 3: GrapeLabs badge — tighter, no wrapping, consistent sizing */}
+            {/* GrapeLabs badge */}
             <div className="flex justify-center mt-2">
               <a
                 href="https://www.grapelabs.in"
@@ -177,7 +174,9 @@ export default function Home() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                BUILT USING AI-POWERED SYSTEMS BY&nbsp;<span style={{ textTransform: 'none', color: '#7C6FD4' }}>GrapeLabs</span>&nbsp;<span style={{ textTransform: 'none', color: '#D4880A' }}>AI</span>
+                BUILT USING AI-POWERED SYSTEMS BY&nbsp;
+                <span style={{ textTransform: 'none', color: '#7C6FD4' }}>GrapeLabs</span>&nbsp;
+                <span style={{ textTransform: 'none', color: '#D4880A' }}>AI</span>
                 <ExternalLink size={10} style={{ flexShrink: 0 }} />
               </a>
             </div>
@@ -227,7 +226,7 @@ export default function Home() {
               tags={['SkiErg', 'Sled Push', 'Wall Balls', 'Open · Pro · Doubles']}
               to="/find-a-partner?sport=hyrox" />
             <SportCard badge="MARATHON" badgeColor="#D4880A" sport="marathon"
-              desc="Matched by pace, weekly mileage, target race, and what you're looking for — a long run partner, tempo buddy, or someone to race alongside on the day."
+              desc="Matched by pace, weekly mileage, target race, and what you are looking for — a long-run partner, tempo buddy, or someone to race alongside on the day."
               tags={['5K to Ultra', 'Pace matched', 'Goal-based', 'All levels']}
               to="/find-a-partner?sport=marathon" />
           </div>
@@ -249,7 +248,7 @@ export default function Home() {
                 area: 'South Delhi',
                 sport: '["hyrox"]',
                 level: 'intermediate',
-                bio: "Software engineer who found HYROX two years ago and hasn't looked back. Training 5 days a week, targeting sub-90 Open. Looking for someone who takes sessions seriously but keeps it fun.",
+                bio: "Software engineer who found HYROX two years ago and has not looked back. Training five days a week, targeting sub-90 Open. Looking for someone who takes sessions seriously but keeps it fun.",
               },
               {
                 id: 'showcase-2',
@@ -258,7 +257,7 @@ export default function Home() {
                 area: 'Bandra',
                 sport: '["marathon"]',
                 level: 'advanced',
-                bio: "Ran my first full marathon in 4:10, targeting 3:45 at Tata Mumbai 2027. I run 70km weeks. Looking for a long-run partner who won't cancel on Sunday mornings.",
+                bio: "Ran my first full marathon in 4:10, targeting 3:45 at Tata Mumbai 2027. Running 70 km weeks. Looking for a long-run partner who will not cancel on Sunday mornings.",
               },
               {
                 id: 'showcase-3',
@@ -267,7 +266,7 @@ export default function Home() {
                 area: 'Koramangala',
                 sport: '["hyrox","marathon"]',
                 level: 'advanced',
-                bio: "Founder by day, HYROX Doubles racer by weekend. Also running TCS World 10K every year. Want someone who trains across both disciplines and understands the grind.",
+                bio: "Founder by day, HYROX Doubles racer on weekends. Also running TCS World 10K every year. Looking for someone who trains across both disciplines and understands the grind.",
               },
             ].map((p) => (
               <div key={p.id} className="rounded-[20px] p-5 border flex flex-col transition-all hover:-translate-y-1"
@@ -345,7 +344,7 @@ export default function Home() {
           ) : (
             <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.5)' }}>Loading upcoming events...</p>
           )}
-          <Link to="/events" className="inline-flex items-center gap-2 font-inter font-semibold text-sm transition-colors hover:text-amber-brand"
+          <Link to="/events" className="inline-flex items-center gap-2 font-inter font-semibold text-sm"
             style={{ color: '#D4880A' }}>
             See All Events <ArrowRight size={16} />
           </Link>
@@ -357,13 +356,15 @@ export default function Home() {
         <div className="max-w-4xl mx-auto text-center">
           <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider mb-6"
             style={{ color: '#F0A500', background: 'rgba(240,165,0,0.08)', border: '1px solid rgba(240,165,0,0.25)' }}>
-            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#D4880A' }} /> POWERED BY <span style={{ textTransform: 'none' }}>GrapeLabs</span> <span style={{ color: '#D4880A' }}>AI</span>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#D4880A' }} /> POWERED BY&nbsp;
+            <span style={{ textTransform: 'none' }}>GrapeLabs</span>&nbsp;
+            <span style={{ color: '#D4880A' }}>AI</span>
           </span>
           <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-4">
             We build the systems that run your business.
           </h2>
           <p className="font-inter text-base mb-8 max-w-xl mx-auto" style={{ color: 'rgba(255,255,255,0.7)', lineHeight: 1.7 }}>
-            GrapeLabs AI automates the day-to-day workflows slowing your team down. Orders, leads, follow-ups, payments, and more. CREW is what we build for fun.
+            GrapeLabs AI automates the day-to-day workflows slowing your team down — orders, leads, follow-ups, payments, and more. CREW is what we build for fun.
           </p>
           <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02]"
