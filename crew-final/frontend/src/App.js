@@ -35,16 +35,32 @@ class ErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#1C0A30', gap: 16, padding: 24 }}>
-          <p style={{ color: '#ef4444', fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 600 }}>Something went wrong.</p>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter, sans-serif', fontSize: 13, textAlign: 'center' }}>
-            {this.state.error?.message || 'An unexpected error occurred.'}
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', height: '100vh', background: '#1C0A30',
+          gap: 16, padding: 24, textAlign: 'center'
+        }}>
+          <p style={{ color: '#D4880A', fontFamily: 'Inter, sans-serif', fontSize: 28, fontWeight: 800, letterSpacing: '-1px' }}>
+            CREW
+          </p>
+          <p style={{ color: '#fff', fontFamily: 'Inter, sans-serif', fontSize: 16, fontWeight: 600, maxWidth: 400 }}>
+            We're experiencing high demand right now.
+          </p>
+          <p style={{ color: 'rgba(255,255,255,0.55)', fontFamily: 'Inter, sans-serif', fontSize: 13, maxWidth: 400, lineHeight: 1.7 }}>
+            If you continue to face issues, please email us at{' '}
+            <a href="mailto:mycrew.find@gmail.com" style={{ color: '#D4880A', textDecoration: 'none' }}>
+              mycrew.find@gmail.com
+            </a>
+            {' '}and we'll get you sorted.
           </p>
           <button
             onClick={() => window.location.href = '/'}
-            style={{ padding: '10px 24px', background: '#D4880A', color: '#fff', border: 'none', borderRadius: 999, fontFamily: 'Inter, sans-serif', fontWeight: 700, cursor: 'pointer' }}
-          >
-            Go Home
+            style={{
+              padding: '10px 24px', background: '#D4880A', color: '#fff',
+              border: 'none', borderRadius: 999, fontFamily: 'Inter, sans-serif',
+              fontWeight: 700, cursor: 'pointer', fontSize: 14, marginTop: 8
+            }}>
+            Back to Home
           </button>
         </div>
       );
