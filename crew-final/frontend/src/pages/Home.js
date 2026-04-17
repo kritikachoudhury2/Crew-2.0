@@ -102,10 +102,13 @@ export default function Home() {
 
   return (
     <div data-testid="home-page">
+
       {/* HERO */}
       <section className="py-14 md:py-24 px-6 md:px-12 relative overflow-hidden" style={{ background: '#1C0A30' }}>
         <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'radial-gradient(circle, #7c6fd4 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 relative z-10">
+
+          {/* LEFT COLUMN */}
           <div className="flex flex-col justify-center">
             <span className="inline-flex items-center self-start gap-2 px-3.5 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider mb-6"
               style={{ color: '#F0A500', background: 'rgba(240,165,0,0.08)', border: '1px solid rgba(240,165,0,0.25)' }}>
@@ -119,35 +122,37 @@ export default function Home() {
               Connect with HYROX and Marathon athletes who train at your level, chase the same race, and show up like you do.
             </p>
 
-            {/* Buttons — full width on mobile, auto on sm+ */}
-<div className="flex flex-col sm:flex-row gap-3 mb-8">
-  <Link to="/get-started"
-    className="flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02]"
-    style={{ background: '#D4880A', color: '#fff' }}>
-    Find My Partner <ArrowRight size={16} />
-  </Link>
-  <Link to="/how-it-works"
-    className="flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3 rounded-pill font-inter font-semibold text-sm"
-    style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
-    See How It Works
-  </Link>
-</div>
+            {/* Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-8">
+              <Link to="/get-started"
+                className="flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02]"
+                style={{ background: '#D4880A', color: '#fff' }}>
+                Find My Partner <ArrowRight size={16} />
+              </Link>
+              <Link to="/how-it-works"
+                className="flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3 rounded-pill font-inter font-semibold text-sm"
+                style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
+                See How It Works
+              </Link>
+            </div>
 
-{/* Stats — centered relative to the two buttons */}
-<div className="flex items-center gap-0 self-start">
-  <div className="flex flex-col items-center">
-    <span className="font-inter font-bold text-2xl text-white leading-tight">500+</span>
-    <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Athletes matched</span>
-  </div>
-  <div className="mx-5 self-stretch" style={{ width: '1px', background: 'rgba(255,255,255,0.15)' }} />
-  <div className="flex flex-col items-center">
-    <span className="font-inter font-bold text-2xl text-white leading-tight">2</span>
-    <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Sports</span>
-  </div>
-</div>
+            {/* Stats */}
+            <div className="flex items-center" style={{ alignSelf: 'flex-start' }}>
+              <div className="flex flex-col items-center">
+                <span className="font-inter font-bold text-2xl text-white leading-tight">500+</span>
+                <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Athletes matched</span>
+              </div>
+              <div className="mx-5" style={{ width: '1px', alignSelf: 'stretch', background: 'rgba(255,255,255,0.15)' }} />
+              <div className="flex flex-col items-center">
+                <span className="font-inter font-bold text-2xl text-white leading-tight">2</span>
+                <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Sports</span>
+              </div>
+            </div>
+          </div>
+          {/* END LEFT COLUMN */}
 
+          {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-4 lg:pt-8">
-            {/* WHAT TO EXPECT — yellow line only, no trailing text */}
             <div className="flex items-center gap-2 mb-1">
               <span className="font-inter font-semibold text-[10px] tracking-[0.18em] uppercase shrink-0" style={{ color: '#D4880A' }}>
                 WHAT TO EXPECT
@@ -160,7 +165,7 @@ export default function Home() {
 
             {/* GrapeLabs badge */}
             <div className="flex justify-center mt-2">
-              <a
+              
                 href="https://www.grapelabs.in"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -180,6 +185,8 @@ export default function Home() {
               </a>
             </div>
           </div>
+          {/* END RIGHT COLUMN */}
+
         </div>
       </section>
 
@@ -372,6 +379,7 @@ export default function Home() {
           </a>
         </div>
       </section>
+
     </div>
   );
 }
