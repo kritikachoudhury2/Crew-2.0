@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../hooks/useAuth';
 import { MessageCircle, Check, X, Trash2, ShieldCheck } from 'lucide-react';
@@ -46,7 +46,8 @@ function WhatsAppButton({ phone, name }) {
 
 export default function MyConnections() {
   const { user } = useAuth();
-  const [tab, setTab] = useState('matches');
+  const [searchParams] = useSearchParams();
+const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
   const [matches, setMatches] = useState([]);
   const [sentReqs, setSentReqs] = useState([]);
   const [recvReqs, setRecvReqs] = useState([]);
