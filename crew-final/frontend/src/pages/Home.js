@@ -165,7 +165,7 @@ export default function Home() {
 
             {/* GrapeLabs badge */}
             <div className="flex justify-center mt-2">
-              
+              <a
                 href="https://www.grapelabs.in"
                 target="_blank"
                 rel="noopener noreferrer"
