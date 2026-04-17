@@ -73,11 +73,10 @@ function NavButtons({ onBack, onNext, disabled, nextLabel = 'Next', showBack = t
 export default function GetStarted() {
   const { user, session, refreshProfile } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams(); // PATCH 1
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState('loading');
   const [answers, setAnswers] = useState({});
   const [email, setEmail] = useState('');
-  // PATCH 2: phone/countryCode state removed — phone is now collected in profile-details step
   const [emailSent, setEmailSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -142,7 +141,7 @@ export default function GetStarted() {
 
     const serialized = {};
     Object.entries(data).forEach(([key, val]) => {
-      if (key.startsWith('_')) return; // skip internal UI-only fields
+      if (key.startsWith('_')) return;
       if (val === undefined || val === null || val === '') return;
       if (Array.isArray(val) && val.length === 0) return;
       if (key === 'sport' || key === 'hyrox_strong' || key === 'hyrox_weak') {
@@ -192,7 +191,6 @@ export default function GetStarted() {
     if (idx > 0) setStep(seq[idx - 1]);
   };
 
-  // PATCH 2: phone removed from handleSendMagicLink — collected in profile-details instead
   const handleSendMagicLink = async () => {
     if (!email) { setError('Email is required'); return; }
     setLoading(true); setError('');
@@ -206,6 +204,20 @@ export default function GetStarted() {
     } catch (e) {
       setError(e.message || 'Failed to send verification email');
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true); setError('');
+    try {
+      const { error: authErr } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (authErr) throw authErr;
+    } catch (e) {
+      setError(e.message || 'Failed to sign in with Google');
       setLoading(false);
     }
   };
@@ -227,7 +239,8 @@ export default function GetStarted() {
       level: answers.level || null,
       bio: answers.bio || null,
       photo_url: answers.photo_url || null,
-      // HYROX-specific fields
+      email: session?.user?.email || user?.email || null,
+      // HYROX fields
       hyrox_target_race: answers.hyrox_target_race || null,
       hyrox_level: answers.hyrox_level || null,
       hyrox_race_goal: answers.hyrox_race_goal || null,
@@ -239,7 +252,8 @@ export default function GetStarted() {
       hyrox_strong: Array.isArray(answers.hyrox_strong) ? JSON.stringify(answers.hyrox_strong) : (answers.hyrox_strong || '[]'),
       hyrox_weak: Array.isArray(answers.hyrox_weak) ? JSON.stringify(answers.hyrox_weak) : (answers.hyrox_weak || '[]'),
       hyrox_5k_time: answers.hyrox_5k_time || null,
-      // Marathon-specific fields
+      hyrox_10k_time: answers.hyrox_10k_time || null,
+      // Marathon fields
       marathon_target_race: answers.marathon_target_race || null,
       marathon_level: answers.marathon_level || null,
       marathon_race_goal: answers.marathon_goal || null,
@@ -251,6 +265,7 @@ export default function GetStarted() {
       marathon_pace: answers.marathon_pace || null,
       marathon_weekly_km: answers.marathon_weekly_km || null,
       marathon_goal: answers.marathon_goal || null,
+      marathon_10k_time: answers.marathon_10k_time || null,
       // Shared fallbacks
       target_race: answers.hyrox_target_race || answers.marathon_target_race || answers.target_race || null,
       race_goal: answers.hyrox_race_goal || answers.marathon_goal || answers.race_goal || null,
@@ -258,12 +273,10 @@ export default function GetStarted() {
       partner_goal: answers.hyrox_partner_goal || answers.marathon_partner_goal || answers.partner_goal || null,
       partner_level_pref: answers.hyrox_partner_level_pref || answers.marathon_partner_level_pref || answers.partner_level_pref || null,
       partner_gender_pref: answers.hyrox_partner_gender_pref || answers.marathon_partner_gender_pref || answers.partner_gender_pref || null,
-      // PATCH 4: use _phoneNumber/_countryCode collected in profile-details step
       phone: answers._phoneNumber?.trim()
         ? `${answers._countryCode || '+91'}${answers._phoneNumber.trim()}`.replace(/\D/g, '')
         : (answers.phone ? answers.phone.replace(/\D/g, '') : null),
       instagram: answers.instagram || null,
-      email: session?.user?.email || user?.email || null,
       flagged: false,
       last_active: new Date().toISOString(),
     };
@@ -330,10 +343,7 @@ export default function GetStarted() {
 
   const goNextValidated = () => {
     const err = validateStep(step);
-    if (err) {
-      setValidationError(err);
-      return;
-    }
+    if (err) { setValidationError(err); return; }
     setValidationError('');
     goNext();
   };
@@ -355,22 +365,38 @@ export default function GetStarted() {
   const renderStep = () => {
     switch (step) {
 
-      // ── AUTH ──────────────────────────────────────────────────────────────
       case 'auth':
         return (
           <div className="max-w-md mx-auto">
-            {/* PATCH 1: heading + subheading differ for login vs new user */}
             <h2 className="font-inter font-[800] text-3xl text-white mb-2">
               {searchParams.get('mode') === 'login' ? 'Welcome back.' : "Let's get you set up."}
             </h2>
             <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.6)' }}>
               {searchParams.get('mode') === 'login'
-                ? 'Sign in via email to access your profile and matches.'
+                ? 'Sign in to access your profile and matches.'
                 : 'Create your profile and find your training partners.'}
             </p>
             {!emailSent ? (
               <>
-                {/* PATCH 2: phone fields removed from auth step entirely */}
+                {/* Google sign-in button */}
+                <button
+                  onClick={handleGoogleSignIn}
+                  disabled={loading}
+                  className="w-full py-3 rounded-full font-inter font-semibold text-sm flex items-center justify-center gap-3 transition-all disabled:opacity-50 mb-4"
+                  style={{ background: '#fff', color: '#1C0A30', border: 'none' }}>
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" fill="#4285F4"/>
+                    <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+                    <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                    <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+                  </svg>
+                  Continue with Google
+                </button>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                  <span className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.4)' }}>or continue with email</span>
+                  <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                </div>
                 <div className="space-y-4 mb-6">
                   <div>
                     <label className="font-inter text-xs font-medium text-white block mb-1.5">Email address</label>
@@ -386,7 +412,7 @@ export default function GetStarted() {
                 <button onClick={handleSendMagicLink} disabled={loading}
                   className="w-full py-3 rounded-full font-inter font-bold text-sm transition-all disabled:opacity-50"
                   style={{ background: '#D4880A', color: '#fff' }}>
-                  {loading ? 'Sending...' : 'Continue'}
+                  {loading ? 'Sending...' : 'Continue with Email'}
                 </button>
               </>
             ) : (
@@ -403,7 +429,6 @@ export default function GetStarted() {
           </div>
         );
 
-      // ── SPORT SELECT ──────────────────────────────────────────────────────
       case 'sport-select':
         return (
           <div className="max-w-md mx-auto">
@@ -432,23 +457,24 @@ export default function GetStarted() {
           </div>
         );
 
-      // ── HYROX 1 of 3 ─────────────────────────────────────────────────────
       case 'hyrox-race':
         return (
           <div className="max-w-md mx-auto">
             <p className="font-inter text-xs mb-2" style={{ color: '#D4880A' }}>HYROX — 1 of 3</p>
             <h2 className="font-inter font-[800] text-3xl text-white mb-6">Your race.</h2>
             <div className="space-y-6">
-              {/* PATCH 5: label changed to required, * added */}
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">
-                  Which race are you targeting? <span style={{ color: '#D4880A' }}>*</span>
-                </label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Which race are you targeting?</label>
+                {/* FIX: value="Not sure yet" so it saves properly */}
                 <select value={answers.hyrox_target_race || ''}
-                  onChange={e => { update('hyrox_target_race', e.target.value); update('target_race', e.target.value); }}
+                  onChange={e => {
+                    const val = e.target.value || null;
+                    update('hyrox_target_race', val);
+                    update('target_race', val);
+                  }}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
-                  <option value="">Not sure yet</option>
+                  <option value="Not sure yet">Not sure yet</option>
                   {events.filter(e => e.sport === 'hyrox').map(e => (
                     <option key={e.slug} value={e.name}>{e.name} — {new Date(e.event_date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</option>
                   ))}
@@ -456,7 +482,7 @@ export default function GetStarted() {
                 </select>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your category</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your category <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'open', label: 'Open', desc: 'Standard solo — most popular' },
@@ -471,7 +497,7 @@ export default function GetStarted() {
                 </div>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">How many HYROX races have you done before?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">How many HYROX races have you done before? <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect
                   options={['0 — this is my first', '1–2', '3–5', '5+']}
                   selected={answers._hyrox_exp} multi={false}
@@ -484,14 +510,10 @@ export default function GetStarted() {
               </div>
             </div>
             {validationError && <p className="font-inter text-sm mt-4" style={{ color: '#ef4444' }}>⚠ {validationError}</p>}
-            {/* PATCH 5: disabled when no target race selected */}
-            <NavButtons onBack={goBack} onNext={goNextValidated}
-              disabled={submitting || !answers.hyrox_target_race}
-              nextLabel={submitting ? 'Saving...' : 'Next'} />
+            <NavButtons onBack={goBack} onNext={goNextValidated} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
           </div>
         );
 
-      // ── HYROX 2 of 3 ─────────────────────────────────────────────────────
       case 'hyrox-fitness':
         return (
           <div className="max-w-md mx-auto">
@@ -499,7 +521,7 @@ export default function GetStarted() {
             <h2 className="font-inter font-[800] text-3xl text-white mb-6">Your fitness.</h2>
             <div className="space-y-6">
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Select your current fitness level</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Select your current fitness level <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'beginner', label: 'Beginner', desc: 'Building base fitness' },
@@ -514,7 +536,7 @@ export default function GetStarted() {
                 </div>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">What do you want out of the race?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">What do you want out of the race? <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'Participating for fun', label: 'Participating for fun', desc: 'Just here to enjoy it' },
@@ -536,8 +558,18 @@ export default function GetStarted() {
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
               </div>
+              {/* NEW: 10K time for HYROX */}
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Training days per week</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">
+                  10K run time <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
+                </label>
+                <input type="text" value={answers.hyrox_10k_time || ''} onChange={e => update('hyrox_10k_time', e.target.value)}
+                  placeholder="e.g. 55:00"
+                  className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
+                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
+              </div>
+              <div>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Training days per week <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['1–2 days', '3–4 days', '5–6 days', 'Every day']}
                   selected={answers.hyrox_training_days} multi={false}
                   onToggle={v => { update('hyrox_training_days', v); update('training_days', v); }} />
@@ -557,7 +589,6 @@ export default function GetStarted() {
           </div>
         );
 
-      // ── HYROX 3 of 3 ─────────────────────────────────────────────────────
       case 'hyrox-stations':
         return (
           <div className="max-w-md mx-auto">
@@ -580,7 +611,7 @@ export default function GetStarted() {
                   onToggle={v => toggleArray('hyrox_weak', v, 3)} maxSelect={3} />
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your ideal training partner</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your ideal training partner <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'Train regularly', label: 'Train together regularly', desc: 'Same programme, consistent sessions' },
@@ -595,14 +626,14 @@ export default function GetStarted() {
                 </div>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect
                   options={['Same as me', 'Better - Challenge me', 'Happy to guide someone', 'No preference']}
                   selected={answers.hyrox_partner_level_pref} multi={false}
                   onToggle={v => { update('hyrox_partner_level_pref', v); update('partner_level_pref', v); }} />
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Do you have a gender preference?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Do you have a gender preference? <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['No preference', 'Men only', 'Women only', 'Other']}
                   selected={answers.hyrox_partner_gender_pref} multi={false}
                   onToggle={v => { update('hyrox_partner_gender_pref', v); update('partner_gender_pref', v); }} />
@@ -613,7 +644,6 @@ export default function GetStarted() {
           </div>
         );
 
-      // ── MARATHON 1 of 3 ───────────────────────────────────────────────────
       case 'marathon-race':
         return (
           <div className="max-w-md mx-auto">
@@ -621,7 +651,7 @@ export default function GetStarted() {
             <h2 className="font-inter font-[800] text-3xl text-white mb-6">Your race.</h2>
             <div className="space-y-6">
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Distance you're training for</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Distance you're training for <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="grid grid-cols-2 gap-2">
                   {['5K', '10K', 'Half Marathon', 'Full Marathon', 'Ultra'].map(d => (
                     <RadioCard key={d} label={d} selected={answers.marathon_distance === d}
@@ -629,16 +659,18 @@ export default function GetStarted() {
                   ))}
                 </div>
               </div>
-              {/* PATCH 6: label changed to required, optional span removed */}
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">
-                  Target race <span style={{ color: '#D4880A' }}>*</span>
-                </label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Target race</label>
+                {/* FIX: value="Not targeting one yet" so it saves properly */}
                 <select value={answers.marathon_target_race || ''}
-                  onChange={e => { update('marathon_target_race', e.target.value); if (!answers.hyrox_target_race) update('target_race', e.target.value); }}
+                  onChange={e => {
+                    const val = e.target.value || null;
+                    update('marathon_target_race', val);
+                    if (!answers.hyrox_target_race) update('target_race', val);
+                  }}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
-                  <option value="">Not targeting one yet</option>
+                  <option value="Not targeting one yet">Not targeting one yet</option>
                   {events.filter(e => e.sport === 'marathon').map(e => (
                     <option key={e.slug} value={e.name}>{e.name} — {new Date(e.event_date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</option>
                   ))}
@@ -646,7 +678,7 @@ export default function GetStarted() {
                 </select>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Races completed at this distance</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Races completed at this distance <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect
                   options={['0 — first time', '1–3', '4–10', '10+']}
                   selected={answers._marathon_exp} multi={false}
@@ -659,14 +691,10 @@ export default function GetStarted() {
               </div>
             </div>
             {validationError && <p className="font-inter text-sm mt-4" style={{ color: '#ef4444' }}>⚠ {validationError}</p>}
-            {/* PATCH 6: disabled when no target race selected */}
-            <NavButtons onBack={goBack} onNext={goNextValidated}
-              disabled={submitting || !answers.marathon_target_race}
-              nextLabel={submitting ? 'Saving...' : 'Next'} />
+            <NavButtons onBack={goBack} onNext={goNextValidated} disabled={submitting} nextLabel={submitting ? 'Saving...' : 'Next'} />
           </div>
         );
 
-      // ── MARATHON 2 of 3 ───────────────────────────────────────────────────
       case 'marathon-training':
         return (
           <div className="max-w-md mx-auto">
@@ -674,7 +702,7 @@ export default function GetStarted() {
             <h2 className="font-inter font-[800] text-3xl text-white mb-6">Your training.</h2>
             <div className="space-y-6">
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Select your current fitness level</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Select your current fitness level <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'beginner', label: 'Beginner', desc: 'Building base fitness' },
@@ -688,24 +716,37 @@ export default function GetStarted() {
                   ))}
                 </div>
               </div>
+              {/* FIX: pace only shown for Half/Full Marathon */}
+              {(answers.marathon_distance === 'Half Marathon' || answers.marathon_distance === 'Full Marathon') && (
+                <div>
+                  <label className="font-inter text-xs font-medium text-white block mb-2">
+                    What's your comfortable long run pace? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
+                  </label>
+                  <input type="text" value={answers.marathon_pace || ''} onChange={e => update('marathon_pace', e.target.value)}
+                    placeholder="e.g. 5:45 per km"
+                    className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
+                    style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
+                  <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Your easy pace, not race pace.</p>
+                </div>
+              )}
+              {/* NEW: 10K personal best for Marathon */}
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">
-                  What's your comfortable long run pace? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
+                  10K personal best <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
                 </label>
-                <input type="text" value={answers.marathon_pace || ''} onChange={e => update('marathon_pace', e.target.value)}
-                  placeholder="e.g. 5:45 per km"
+                <input type="text" value={answers.marathon_10k_time || ''} onChange={e => update('marathon_10k_time', e.target.value)}
+                  placeholder="e.g. 55:00"
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
-                <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Your easy pace, not race pace.</p>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">What's your avg weekly distance?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">What's your avg weekly distance? <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['Under 20km', '20–40km', '40–60km', '60–80km', '80km+']}
                   selected={answers.marathon_weekly_km} multi={false}
                   onToggle={v => update('marathon_weekly_km', v)} />
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Training days per week</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Training days per week <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['1–2 days', '2–3 days', '4–5 days', '6–7 days']}
                   selected={answers.marathon_training_days} multi={false}
                   onToggle={v => { update('marathon_training_days', v); if (!answers.hyrox_training_days) update('training_days', v); }} />
@@ -716,7 +757,6 @@ export default function GetStarted() {
           </div>
         );
 
-      // ── MARATHON 3 of 3 ───────────────────────────────────────────────────
       case 'marathon-partner':
         return (
           <div className="max-w-md mx-auto">
@@ -724,7 +764,7 @@ export default function GetStarted() {
             <h2 className="font-inter font-[800] text-3xl text-white mb-6">Your goal and partner.</h2>
             <div className="space-y-6">
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">What do you want out of the race?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">What do you want out of the race? <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'Participating for fun', label: 'Participating for fun', desc: 'First time, getting to the line is the goal' },
@@ -739,7 +779,7 @@ export default function GetStarted() {
                 </div>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your ideal training partner</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your ideal training partner <span style={{ color: '#D4880A' }}>*</span></label>
                 <div className="space-y-2">
                   {[
                     { val: 'Long run partner', label: 'Long run partner', desc: 'Weekend distance together' },
@@ -755,14 +795,14 @@ export default function GetStarted() {
                 </div>
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Choose your preferred partner level <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect
                   options={['Same as me', 'Better - Challenge me', 'Happy to guide someone', 'No preference']}
                   selected={answers.marathon_partner_level_pref} multi={false}
                   onToggle={v => { update('marathon_partner_level_pref', v); if (!answers.hyrox_partner_level_pref) update('partner_level_pref', v); }} />
               </div>
               <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">Do you have a gender preference?</label>
+                <label className="font-inter text-xs font-medium text-white block mb-2">Do you have a gender preference? <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['No preference', 'Men only', 'Women only', 'Other']}
                   selected={answers.marathon_partner_gender_pref} multi={false}
                   onToggle={v => { update('marathon_partner_gender_pref', v); if (!answers.hyrox_partner_gender_pref) update('partner_gender_pref', v); }} />
@@ -773,7 +813,6 @@ export default function GetStarted() {
           </div>
         );
 
-      // ── PROFILE DETAILS ───────────────────────────────────────────────────
       case 'profile-details':
         return (
           <div className="max-w-md mx-auto">
@@ -800,8 +839,6 @@ export default function GetStarted() {
                   selected={answers.gender} multi={false}
                   onToggle={v => update('gender', v)} />
               </div>
-
-              {/* PATCH 3: Phone field placed after gender, marked required */}
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-1.5">
                   Phone number <span style={{ color: '#D4880A' }}>*</span>
@@ -828,13 +865,12 @@ export default function GetStarted() {
                   Never shown publicly. Only used after a mutual match.
                 </p>
               </div>
-
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-1.5">
                   Bio <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
                 </label>
                 <textarea value={answers.bio || ''} onChange={e => update('bio', e.target.value.slice(0, 200))}
-                  placeholder="e.g. Engineer by day, Hyrox-obsessed by night. Looking for someone who won't quit at station 5."
+                  placeholder="e.g. Engineer by day, Hyrox-obsessed by night."
                   maxLength={200} rows={3}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none resize-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
@@ -859,7 +895,6 @@ export default function GetStarted() {
                 style={{ border: '2px solid rgba(74,61,143,0.30)', color: '#fff' }}>
                 <ArrowLeft size={16} />
               </button>
-              {/* Phone is required: !answers._phoneNumber?.trim() added to disabled condition */}
               <button onClick={() => goNext()}
                 disabled={!answers.name?.trim() || !answers.age || !answers.gender || !answers._phoneNumber?.trim() || submitting}
                 className="flex-1 py-3 rounded-full font-inter font-bold text-sm disabled:opacity-30"
@@ -870,7 +905,6 @@ export default function GetStarted() {
           </div>
         );
 
-      // ── LOCATION ──────────────────────────────────────────────────────────
       case 'location':
         return (
           <div className="max-w-md mx-auto">
@@ -943,7 +977,6 @@ export default function GetStarted() {
           </div>
         );
 
-      // ── DONE ──────────────────────────────────────────────────────────────
       case 'done':
         return (
           <div className="max-w-md mx-auto text-center">
