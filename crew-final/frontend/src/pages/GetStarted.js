@@ -263,6 +263,7 @@ export default function GetStarted() {
         ? `${answers._countryCode || '+91'}${answers._phoneNumber.trim()}`.replace(/\D/g, '')
         : (answers.phone ? answers.phone.replace(/\D/g, '') : null),
       instagram: answers.instagram || null,
+      email: session?.user?.email || user?.email || null,
       flagged: false,
       last_active: new Date().toISOString(),
     };
