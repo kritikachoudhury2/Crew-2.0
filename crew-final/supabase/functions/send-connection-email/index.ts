@@ -4,12 +4,11 @@ import { createHmac } from 'https://deno.land/std@0.177.0/node/crypto.ts';
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!;
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const TOKEN_SECRET = Deno.env.get('ACCEPT_TOKEN_SECRET')!; // Set this in Supabase secrets
+const TOKEN_SECRET = Deno.env.get('ACCEPT_TOKEN_SECRET')!;
 const FROM_EMAIL = 'crew@crewbygrapelabs.in';
 const APP_URL = 'https://www.crewbygrapelabs.in';
 const EDGE_URL = `${SUPABASE_URL}/functions/v1/accept-and-connect`;
 
-// Token expires in 7 days
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function generateToken(requestId: string, fromUserId: string, toUserId: string): string {
@@ -61,7 +60,6 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-    // Fetch full sender profile + recipient email
     const [{ data: fromProfile }, { data: toProfile }] = await Promise.all([
       supabase.from('profiles').select(
         'name, city, area, sport, level, bio, target_race, hyrox_category, hyrox_5k_time, hyrox_10k_time, hyrox_target_race, hyrox_race_goal, hyrox_training_days, marathon_distance, marathon_pace, marathon_5k_time, marathon_10k_time, marathon_target_race, marathon_goal, marathon_training_days, partner_goal, profile_views'
@@ -69,7 +67,6 @@ Deno.serve(async (req) => {
       supabase.from('profiles').select('name, email').eq('id', to_user_id).single(),
     ]);
 
-    // Fallback: get email from auth.users if not in profile
     let recipientEmail = toProfile?.email;
     if (!recipientEmail) {
       const { data: authUser } = await supabase.auth.admin.getUserById(to_user_id);
@@ -83,18 +80,15 @@ Deno.serve(async (req) => {
     const senderLocation = senderArea ? `${senderArea}, ${senderCity}` : senderCity;
     const senderSport = parseSports(fromProfile?.sport);
 
-    // Generate signed accept token
     const token = generateToken(requestId, from_user_id, to_user_id);
     const acceptUrl = `${EDGE_URL}?token=${encodeURIComponent(token)}`;
 
-    // Build sport badges
     let sportBadges = '';
     try {
       const sports = JSON.parse(fromProfile?.sport || '[]') as string[];
       sportBadges = sports.map(sportBadgeHtml).join('');
     } catch { sportBadges = senderSport ? sportBadgeHtml(senderSport) : ''; }
 
-    // Build profile stats rows based on sport
     let statsRows = '';
     const sports = (() => { try { return JSON.parse(fromProfile?.sport || '[]') as string[]; } catch { return [] as string[]; } })();
 
@@ -131,7 +125,7 @@ Deno.serve(async (req) => {
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#0e0624;font-family:Inter,Arial,sans-serif;">
+<body style="margin:0;padding:0;background:#ffffff;font-family:Inter,Arial,sans-serif;">
   <div style="max-width:520px;margin:32px auto;padding:16px;">
 
     <!-- Card -->
@@ -184,19 +178,17 @@ Deno.serve(async (req) => {
           Accept to connect — WhatsApp will open immediately so you can start planning.
         </p>
         <div style="display:flex;gap:12px;flex-wrap:wrap;">
-          <!-- Accept → WhatsApp (one-click, no login needed) -->
           <a href="${acceptUrl}"
             style="display:inline-block;background:#25D366;color:#fff;padding:13px 24px;border-radius:999px;font-weight:700;font-size:14px;text-decoration:none;margin-right:8px;margin-bottom:8px;">
-            ✓ Accept &amp; Open WhatsApp
+            Accept &amp; Connect Now
           </a>
-          <!-- View in app -->
           <a href="${APP_URL}/my-connections?tab=received"
             style="display:inline-block;background:transparent;color:#fff;padding:12px 24px;border-radius:999px;font-weight:600;font-size:14px;text-decoration:none;border:2px solid rgba(107,95,160,0.6);margin-bottom:8px;">
-            View in App
+            View Full Profile on CREW
           </a>
         </div>
         <p style="font-size:11px;color:rgba(255,255,255,0.3);margin:12px 0 0;line-height:1.5;">
-          The Accept &amp; WhatsApp link works for 7 days. After that, accept from My Connections in the app.<br>
+          The Accept &amp; Connect link works for 7 days. After that, accept from My Connections on the CREW website.<br>
           You are receiving this because you have a CREW account.
         </p>
       </div>
