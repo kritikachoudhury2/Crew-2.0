@@ -25,6 +25,9 @@ const sportBadge = (s) => {
 };
 const parseArr = (s) => { try { return typeof s === 'string' ? JSON.parse(s) : s || []; } catch { return []; } };
 
+// Append "mins" to a time value if it exists
+const withMins = (val) => val ? `${val} mins` : null;
+
 const FILTER_CITIES = ['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa', 'Chennai', 'Kolkata', 'Other'];
 const FILTER_LEVELS = [
   { val: 'beginner', label: 'Beginner' },
@@ -51,9 +54,6 @@ export default function FindAPartner() {
     city: [], level: [], gender: [],
   });
 
-  // Tracks which profileIds are currently mid-connect request
-  // This is a ref (not state) so it doesn't trigger re-renders and can't be
-  // read stale inside the async handleConnect closure
   const connectingRef = useRef(new Set());
   const [connectingIds, setConnectingIds] = useState(new Set());
 
@@ -64,7 +64,7 @@ export default function FindAPartner() {
         if (attempt > 0) await new Promise(r => setTimeout(r, 500 * attempt));
         const result = await supabase
           .from('profiles')
-          .select('id,name,age,gender,city,area,lat,lng,sport,level,bio,photo_url,phone,target_race,hyrox_category,hyrox_strong,hyrox_weak,hyrox_5k_time,hyrox_10k_time,marathon_pace,marathon_distance,marathon_weekly_km,marathon_goal,marathon_10k_time,race_goal,training_days,partner_goal,partner_level_pref,partner_gender_pref,email_verified,last_active,profile_views,flagged')
+          .select('id,name,age,gender,city,area,lat,lng,sport,level,bio,photo_url,phone,target_race,hyrox_category,hyrox_strong,hyrox_weak,hyrox_5k_time,hyrox_10k_time,marathon_pace,marathon_distance,marathon_weekly_km,marathon_goal,marathon_5k_time,marathon_10k_time,race_goal,training_days,partner_goal,partner_level_pref,partner_gender_pref,email_verified,last_active,profile_views,flagged')
           .neq('flagged', true)
           .neq('id', user?.id || '')
           .filter('name', 'not.is', null)
@@ -88,23 +88,19 @@ export default function FindAPartner() {
       if (!user) return;
       const states = {};
       const phones = {};
-
       const [sentRes, recvRes, matchRes] = await Promise.all([
         supabase.from('connect_requests').select('to_user_id').eq('from_user_id', user.id).eq('status', 'pending'),
         supabase.from('connect_requests').select('from_user_id').eq('to_user_id', user.id).eq('status', 'pending'),
         supabase.from('matches').select('user1_id, user2_id').or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`),
       ]);
-
       (sentRes.data || []).forEach(r => { states[r.to_user_id] = 'sent'; });
       (recvRes.data || []).forEach(r => { states[r.from_user_id] = 'received'; });
-
       for (const m of (matchRes.data || [])) {
         const partnerId = m.user1_id === user.id ? m.user2_id : m.user1_id;
         states[partnerId] = 'matched';
         const { data: pData } = await supabase.from('profiles').select('phone').eq('id', partnerId).single();
         if (pData?.phone) phones[partnerId] = pData.phone;
       }
-
       setConnectionStates(states);
       setMatchedPhones(phones);
     };
@@ -142,75 +138,37 @@ export default function FindAPartner() {
   const handleConnect = async (e, profileId) => {
     e.stopPropagation();
     if (!user) { toast.error('Sign in to connect'); return; }
-
-    // ── DUPLICATE PREVENTION ──────────────────────────────────────────────
-    // 1. Check in-flight: if this exact profileId is already being processed, bail
     if (connectingRef.current.has(profileId)) return;
-
-    // 2. Check current known state: already sent/matched/received
     const currentState = connectionStates[profileId];
     if (currentState === 'sent' || currentState === 'matched') return;
 
-    // 3. Lock this profileId immediately (before any async work)
     connectingRef.current.add(profileId);
     setConnectingIds(prev => new Set([...prev, profileId]));
 
     try {
-      // 4. Pre-flight DB check: does a pending request already exist?
-      //    This catches cases where state loaded before a duplicate was inserted
       const { data: existing } = await supabase
-        .from('connect_requests')
-        .select('id')
-        .eq('from_user_id', user.id)
-        .eq('to_user_id', profileId)
-        .eq('status', 'pending')
+        .from('connect_requests').select('id')
+        .eq('from_user_id', user.id).eq('to_user_id', profileId).eq('status', 'pending')
         .maybeSingle();
+      if (existing) { setConnectionStates(prev => ({ ...prev, [profileId]: 'sent' })); return; }
 
-      if (existing) {
-        // Already exists — just update UI state and bail
-        setConnectionStates(prev => ({ ...prev, [profileId]: 'sent' }));
-        return;
-      }
-
-      // 5. Check daily limit
-      const { count } = await supabase
-        .from('connect_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('from_user_id', user.id)
+      const { count } = await supabase.from('connect_requests')
+        .select('*', { count: 'exact', head: true }).eq('from_user_id', user.id)
         .gte('created_at', new Date(Date.now() - 86400000).toISOString());
+      if (count >= 10) { toast.error('Daily limit of 10 requests reached. Resets in 24 hours.'); return; }
 
-      if (count >= 10) {
-        toast.error('Daily limit of 10 requests reached. Resets in 24 hours.');
-        return;
-      }
-
-      // 6. Insert — DB unique constraint (from_user_id, to_user_id) is the final safety net
-      const { error } = await supabase
-        .from('connect_requests')
+      const { error } = await supabase.from('connect_requests')
         .insert({ from_user_id: user.id, to_user_id: profileId, status: 'pending' });
-
       if (error) {
-        // Unique constraint violation = duplicate — treat as already sent
-        if (error.code === '23505') {
-          setConnectionStates(prev => ({ ...prev, [profileId]: 'sent' }));
-          return;
-        }
+        if (error.code === '23505') { setConnectionStates(prev => ({ ...prev, [profileId]: 'sent' })); return; }
         toast.error('Could not send request. Please try again.');
         return;
       }
-
-      // 7. Optimistic update
       setConnectionStates(prev => ({ ...prev, [profileId]: 'sent' }));
       toast.success(`Connection request sent! ${Math.max(0, 9 - count)} requests remaining today.`);
-
     } finally {
-      // Always unlock, regardless of outcome
       connectingRef.current.delete(profileId);
-      setConnectingIds(prev => {
-        const next = new Set(prev);
-        next.delete(profileId);
-        return next;
-      });
+      setConnectingIds(prev => { const n = new Set(prev); n.delete(profileId); return n; });
     }
   };
 
@@ -236,13 +194,15 @@ export default function FindAPartner() {
   const clearFilters = () => setFilters({ sport: [], city: [], level: [], gender: [] });
   const activeCount = Object.values(filters).reduce((a, b) => a + b.length, 0);
 
+  // ── DETAIL LINE — shows times with "mins" suffix ──────────────────────────
   const getDetailLine = (p) => {
     const sports = parseSports(p.sport);
     if (sports.includes('hyrox')) {
       const parts = [];
-      if (p.hyrox_5k_time) parts.push(`5K: ${p.hyrox_5k_time}`);
-      if (p.hyrox_10k_time) parts.push(`10K: ${p.hyrox_10k_time}`);
+      if (p.hyrox_5k_time) parts.push(`5K: ${withMins(p.hyrox_5k_time)}`);
+      if (p.hyrox_10k_time) parts.push(`10K: ${withMins(p.hyrox_10k_time)}`);
       if (parts.length > 0) return parts.join(' · ');
+      // Fallback to stations if no times
       const strong = parseArr(p.hyrox_strong).slice(0, 2).join(', ');
       const weak = parseArr(p.hyrox_weak).slice(0, 1).join(', ');
       return `${strong ? `Strong: ${strong}` : ''}${weak ? ` · Working on: ${weak}` : ''}`;
@@ -251,7 +211,8 @@ export default function FindAPartner() {
       const parts = [];
       if (p.marathon_distance) parts.push(p.marathon_distance);
       if (p.marathon_pace) parts.push(`Pace: ${p.marathon_pace}/km`);
-      if (p.marathon_10k_time) parts.push(`10K: ${p.marathon_10k_time}`);
+      if (p.marathon_5k_time) parts.push(`5K: ${withMins(p.marathon_5k_time)}`);
+      if (p.marathon_10k_time) parts.push(`10K: ${withMins(p.marathon_10k_time)}`);
       if (p.marathon_weekly_km) parts.push(p.marathon_weekly_km);
       return parts.join(' · ');
     }
@@ -261,20 +222,17 @@ export default function FindAPartner() {
   const renderConnectButton = (p) => {
     const state = connectionStates[p.id];
     const isConnecting = connectingIds.has(p.id);
-
     if (state === 'matched') {
       const phone = (matchedPhones[p.id] || p.phone || '').replace(/\D/g, '');
       return (
         <a href={phone ? `https://wa.me/${phone}?text=Hey!+We+matched+on+CREW+%E2%80%94+want+to+train%3F` : '#'}
-          target="_blank" rel="noopener noreferrer"
-          onClick={e => e.stopPropagation()}
+          target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
           className="flex-1 text-center py-2 rounded-pill font-inter font-semibold text-xs flex items-center justify-center gap-1.5"
           style={{ background: '#25D366', color: '#fff' }}>
           <MessageCircle size={12} /> Open WhatsApp
         </a>
       );
     }
-
     if (state === 'sent') return (
       <button disabled onClick={e => e.stopPropagation()}
         className="flex-1 py-2 rounded-pill font-inter font-semibold text-xs opacity-70 cursor-not-allowed"
@@ -282,7 +240,6 @@ export default function FindAPartner() {
         Request Sent ✓
       </button>
     );
-
     if (state === 'received') return (
       <Link to="/my-connections?tab=received" onClick={e => e.stopPropagation()}
         className="flex-1 text-center py-2 rounded-pill font-inter font-semibold text-xs"
@@ -290,12 +247,8 @@ export default function FindAPartner() {
         Respond to Request →
       </Link>
     );
-
-    // Default: not yet connected
     return (
-      <button
-        onClick={e => handleConnect(e, p.id)}
-        disabled={isConnecting}
+      <button onClick={e => handleConnect(e, p.id)} disabled={isConnecting}
         className="flex-1 py-2 rounded-pill font-inter font-semibold text-xs transition-all hover:scale-[1.02] disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100"
         style={{ background: '#D4880A', color: '#fff' }}>
         {isConnecting ? 'Sending...' : <>Connect <ArrowRight size={12} className="inline ml-1" /></>}
@@ -394,8 +347,7 @@ export default function FindAPartner() {
               ) : results.length > 0 ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {results.map(p => (
-                    <div key={p.id}
-                      onClick={() => navigate(`/athlete/${p.id}`)}
+                    <div key={p.id} onClick={() => navigate(`/athlete/${p.id}`)}
                       className="rounded-[20px] p-5 border transition-all hover:-translate-y-1 cursor-pointer"
                       style={{ background: 'rgba(42,26,69,0.60)', borderColor: 'rgba(74,61,143,0.30)' }}>
                       <div className="flex items-start gap-3 mb-3">
