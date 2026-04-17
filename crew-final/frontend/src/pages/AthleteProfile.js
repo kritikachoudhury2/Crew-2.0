@@ -19,6 +19,9 @@ function GradientAvatar({ name, size = 80 }) {
   );
 }
 
+// Append "mins" to a time value
+const withMins = (val) => val ? `${val} mins` : null;
+
 function StatCard({ label, val }) {
   const displayVal = typeof val === 'string' ? val.trim() : val;
   if (!displayVal) return null;
@@ -49,6 +52,7 @@ export default function AthleteProfile() {
 
   useEffect(() => {
     const fetchAthlete = async () => {
+      // Select includes all 4 time fields + new marathon_5k_time
       const { data } = await supabase.from('profiles').select('*').eq('id', id).single();
       if (data) setAthlete(data);
       else setAthlete(SEED_PROFILES.find(p => p.id === id) || null);
@@ -90,10 +94,19 @@ export default function AthleteProfile() {
       toast.error("You've reached your daily limit of 10 connection requests. Resets in 24 hours.", { duration: 5000 });
       return;
     }
+    // Pre-flight check for existing request
+    const { data: existing } = await supabase.from('connect_requests').select('id')
+      .eq('from_user_id', user.id).eq('to_user_id', id).eq('status', 'pending').maybeSingle();
+    if (existing) { setConnectionState('sent'); return; }
+
     const { error } = await supabase.from('connect_requests').insert({
       from_user_id: user.id, to_user_id: id, status: 'pending'
     });
-    if (error) { toast.error('Could not send request. Please try again.'); return; }
+    if (error) {
+      if (error.code === '23505') { setConnectionState('sent'); return; }
+      toast.error('Could not send request. Please try again.');
+      return;
+    }
     setConnectionState('sent');
     toast.success(`Connection request sent! ${Math.max(0, 9 - count)} requests remaining today.`);
   };
@@ -133,18 +146,17 @@ export default function AthleteProfile() {
   const matchScore = myProfile ? calcMatchScore(myProfile, athlete) : 0;
   const matchReason = myProfile ? getWhyMatched(myProfile, athlete) : '';
 
-  // Helper: get sport-specific value, falling back to shared field
   const hyroxVal = (sportField, sharedField) => athlete[sportField] || athlete[sharedField] || null;
   const marathonVal = (sportField, sharedField) => athlete[sportField] || (sports.includes('hyrox') ? null : athlete[sharedField]) || null;
 
-  // Check if grid sections have any data to show (avoids rendering empty containers)
-  const hasHyroxStats = !!(athlete.hyrox_category || athlete.hyrox_5k_time ||
+  const hasHyroxStats = !!(athlete.hyrox_category || athlete.hyrox_5k_time || athlete.hyrox_10k_time ||
     hyroxVal('hyrox_target_race', 'target_race') || hyroxVal('hyrox_race_goal', 'race_goal') ||
     hyroxVal('hyrox_training_days', 'training_days') || hyroxVal('hyrox_level', 'level'));
   const hasHyroxPartner = !!(hyroxVal('hyrox_partner_goal', 'partner_goal') ||
     hyroxVal('hyrox_partner_level_pref', 'partner_level_pref') ||
     hyroxVal('hyrox_partner_gender_pref', 'partner_gender_pref'));
   const hasMarathonStats = !!(athlete.marathon_distance || athlete.marathon_pace ||
+    athlete.marathon_5k_time || athlete.marathon_10k_time ||
     athlete.marathon_weekly_km || marathonVal('marathon_target_race', 'target_race') ||
     athlete.marathon_goal || marathonVal('marathon_training_days', 'training_days') ||
     marathonVal('marathon_level', 'level'));
@@ -226,7 +238,7 @@ export default function AthleteProfile() {
           {sports.includes('hyrox') && (
             <div className="rounded-[20px] p-6 border mb-6" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)' }}>
               <h3 className="font-inter font-bold text-sm text-white mb-4 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full" style={{ background: '#4A3D8F', display: 'inline-block' }} /> HYROX Details
+                <span className="w-2 h-2 rounded-full inline-block" style={{ background: '#4A3D8F' }} /> HYROX Details
               </h3>
               {hasHyroxStats && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-4">
@@ -236,11 +248,13 @@ export default function AthleteProfile() {
                       <span className="px-2 py-0.5 rounded-pill text-[10px] font-inter font-bold text-white" style={{ background: '#4A3D8F' }}>{athlete.hyrox_category.replace('_', ' ').toUpperCase()}</span>
                     </div>
                   )}
+                  {/* 5K with mins */}
                   {athlete.hyrox_5k_time?.trim() && (
-                    <div className="rounded-[12px] p-3 border" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)' }}>
-                      <p className="font-inter text-[10px] uppercase tracking-wider mb-1" style={{ color: 'rgba(255,255,255,0.4)' }}>5K Time</p>
-                      <p className="font-inter text-sm font-medium text-white">{athlete.hyrox_5k_time.trim()}</p>
-                    </div>
+                    <StatCard label="5K Time" val={withMins(athlete.hyrox_5k_time.trim())} />
+                  )}
+                  {/* 10K with mins */}
+                  {athlete.hyrox_10k_time?.trim() && (
+                    <StatCard label="10K Time" val={withMins(athlete.hyrox_10k_time.trim())} />
                   )}
                   <StatCard label="Target Race" val={hyroxVal('hyrox_target_race', 'target_race')} />
                   <StatCard label="Race Goal" val={hyroxVal('hyrox_race_goal', 'race_goal')} />
@@ -282,12 +296,20 @@ export default function AthleteProfile() {
           {sports.includes('marathon') && (
             <div className="rounded-[20px] p-6 border mb-6" style={{ background: 'rgba(42,26,69,0.40)', borderColor: 'rgba(74,61,143,0.20)' }}>
               <h3 className="font-inter font-bold text-sm text-white mb-4 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full" style={{ background: '#D4880A', display: 'inline-block' }} /> Marathon Details
+                <span className="w-2 h-2 rounded-full inline-block" style={{ background: '#D4880A' }} /> Marathon Details
               </h3>
               {hasMarathonStats && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                   {athlete.marathon_distance && <StatCard label="Distance" val={athlete.marathon_distance} />}
                   {athlete.marathon_pace && <StatCard label="Easy Pace" val={`${athlete.marathon_pace}/km`} />}
+                  {/* 5K with mins */}
+                  {athlete.marathon_5k_time?.trim() && (
+                    <StatCard label="5K Time" val={withMins(athlete.marathon_5k_time.trim())} />
+                  )}
+                  {/* 10K with mins */}
+                  {athlete.marathon_10k_time?.trim() && (
+                    <StatCard label="10K Time" val={withMins(athlete.marathon_10k_time.trim())} />
+                  )}
                   {athlete.marathon_weekly_km && <StatCard label="Weekly KM" val={athlete.marathon_weekly_km} />}
                   <StatCard label="Target Race" val={marathonVal('marathon_target_race', 'target_race')} />
                   <StatCard label="Race Goal" val={athlete.marathon_goal || marathonVal('marathon_race_goal', 'race_goal')} />
@@ -327,9 +349,9 @@ export default function AthleteProfile() {
                 <MessageCircle size={16} /> Open WhatsApp
               </a>
             ) : connectionState === 'sent' ? (
-              <button disabled className="flex-1 py-3 rounded-pill font-inter font-semibold text-sm opacity-60"
+              <button disabled className="flex-1 py-3 rounded-pill font-inter font-semibold text-sm opacity-60 cursor-not-allowed"
                 style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
-                Request Sent
+                Request Sent ✓
               </button>
             ) : (
               <button onClick={handleConnect}
@@ -349,7 +371,6 @@ export default function AthleteProfile() {
               <Heart size={16} fill={isSaved ? '#D4880A' : 'none'} />
             </button>
           </div>
-
           {reportSent && (
             <p className="font-inter text-xs mt-4" style={{ color: '#D4880A' }}>Report submitted. We will review this profile.</p>
           )}
