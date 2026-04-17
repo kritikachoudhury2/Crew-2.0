@@ -1,12 +1,40 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Users, LogOut } from 'lucide-react';
+import { Menu, X, Users, LogOut, Search } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, profile, signOut } = useAuth();
   const location = useLocation();
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) { setPendingCount(0); return; }
+
+    const fetchPending = async () => {
+      const { count } = await supabase
+        .from('connect_requests')
+        .select('*', { count: 'exact', head: true })
+        .eq('to_user_id', user.id)
+        .eq('status', 'pending');
+      setPendingCount(count || 0);
+    };
+
+    fetchPending();
+
+    const channel = supabase.channel(`navbar_pending_${user.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'connect_requests',
+        filter: `to_user_id=eq.${user.id}`,
+      }, fetchPending)
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
 
   const handleSignOut = async () => {
     setMobileOpen(false);
@@ -22,6 +50,26 @@ export default function Navbar() {
   ];
 
   const isActive = (path) => path === '/' ? location.pathname === '/' : location.pathname === path;
+
+  const ConnectionsBadge = ({ size = 'sm' }) => {
+    if (pendingCount === 0) return null;
+    return (
+      <span
+        className="absolute font-inter font-bold flex items-center justify-center rounded-full"
+        style={{
+          background: '#D4880A', color: '#fff',
+          fontSize: size === 'sm' ? '9px' : '10px',
+          minWidth: size === 'sm' ? '15px' : '18px',
+          height: size === 'sm' ? '15px' : '18px',
+          top: size === 'sm' ? '-2px' : '-3px',
+          right: size === 'sm' ? '-2px' : '-3px',
+          padding: '0 3px',
+          lineHeight: 1,
+        }}>
+        {pendingCount > 9 ? '9+' : pendingCount}
+      </span>
+    );
+  };
 
   return (
     <>
@@ -40,7 +88,7 @@ export default function Navbar() {
           </a>
         </Link>
 
-        {/* Desktop Links */}
+        {/* Desktop nav links */}
         <div className="hidden md:flex items-center gap-8">
           {navLinks.map(link => (
             <Link key={link.to} to={link.to}
@@ -51,15 +99,25 @@ export default function Navbar() {
           ))}
         </div>
 
-        {/* Desktop Right */}
-        <div className="hidden md:flex items-center gap-4">
+        {/* Desktop right */}
+        <div className="hidden md:flex items-center gap-3">
           {user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              {/* Find a Partner icon */}
+              <Link to="/find-a-partner" title="Find a Partner"
+                className="relative p-2 rounded-full transition-colors"
+                style={{ color: isActive('/find-a-partner') ? '#D4880A' : 'rgba(255,255,255,0.6)' }}>
+                <Search size={18} />
+              </Link>
+
+              {/* My Connections icon + badge */}
               <Link to="/my-connections" title="My Connections"
-                className="p-2 rounded-full transition-colors"
+                className="relative p-2 rounded-full transition-colors"
                 style={{ color: isActive('/my-connections') ? '#D4880A' : 'rgba(255,255,255,0.6)' }}>
                 <Users size={18} />
+                <ConnectionsBadge size="sm" />
               </Link>
+
               <Link to="/profile/edit"
                 className="font-inter font-medium text-sm px-5 py-2 rounded-pill"
                 style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
@@ -71,7 +129,6 @@ export default function Navbar() {
             </div>
           ) : (
             <div className="flex items-center gap-3">
-              {/* Returning users see Log In, new users see Get Started */}
               <Link to="/get-started?mode=login"
                 className="font-inter font-medium text-sm px-5 py-2 rounded-pill transition-all"
                 style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
@@ -86,14 +143,22 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* Mobile right — connections icon + hamburger */}
-        <div className="flex md:hidden items-center gap-2">
+        {/* Mobile right */}
+        <div className="flex md:hidden items-center gap-1">
           {user && (
-            <Link to="/my-connections" onClick={() => setMobileOpen(false)}
-              className="p-2 rounded-full"
-              style={{ color: isActive('/my-connections') ? '#D4880A' : 'rgba(255,255,255,0.7)' }}>
-              <Users size={22} />
-            </Link>
+            <>
+              <Link to="/find-a-partner" onClick={() => setMobileOpen(false)}
+                className="relative p-2 rounded-full"
+                style={{ color: isActive('/find-a-partner') ? '#D4880A' : 'rgba(255,255,255,0.7)' }}>
+                <Search size={22} />
+              </Link>
+              <Link to="/my-connections" onClick={() => setMobileOpen(false)}
+                className="relative p-2 rounded-full"
+                style={{ color: isActive('/my-connections') ? '#D4880A' : 'rgba(255,255,255,0.7)' }}>
+                <Users size={22} />
+                <ConnectionsBadge size="sm" />
+              </Link>
+            </>
           )}
           <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2" style={{ color: '#fff' }}>
             {mobileOpen ? <X size={24} /> : <Menu size={24} />}
@@ -101,7 +166,7 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* Mobile Menu */}
+      {/* Mobile menu */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-6"
           style={{ background: '#1C0A30', top: '64px' }}>
@@ -116,8 +181,14 @@ export default function Navbar() {
           {user ? (
             <>
               <Link to="/my-connections" onClick={() => setMobileOpen(false)}
-                className="font-inter font-medium text-xl" style={{ color: '#fff' }}>
+                className="font-inter font-medium text-xl flex items-center gap-2" style={{ color: '#fff' }}>
                 My Connections
+                {pendingCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full font-inter font-bold text-xs"
+                    style={{ background: '#D4880A', color: '#fff' }}>
+                    {pendingCount}
+                  </span>
+                )}
               </Link>
               <Link to="/profile/edit" onClick={() => setMobileOpen(false)}
                 className="font-inter font-medium text-xl" style={{ color: '#fff' }}>
