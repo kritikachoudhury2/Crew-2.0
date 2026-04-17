@@ -118,25 +118,29 @@ export default function Home() {
             <p className="font-inter text-base md:text-lg mb-8 max-w-[480px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.7)' }}>
               Connect with HYROX and Marathon athletes who train at your level, chase the same race, and show up like you do.
             </p>
-            <div className="flex flex-wrap gap-3 mb-8">
-              <Link to="/get-started" className="inline-flex items-center gap-2 px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02]"
+
+            {/* FIX 1: Full-width stacked buttons on mobile, inline on sm+ */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-8">
+              <Link to="/get-started"
+                className="flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02]"
                 style={{ background: '#D4880A', color: '#fff' }}>
                 Find My Partner <ArrowRight size={16} />
               </Link>
-              <Link to="/how-it-works" className="inline-flex items-center gap-2 px-7 py-3 rounded-pill font-inter font-semibold text-sm"
+              <Link to="/how-it-works"
+                className="flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3 rounded-pill font-inter font-semibold text-sm"
                 style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
                 See How It Works
               </Link>
             </div>
 
-            {/* CHANGE 1: Stats as plain text separated by a thin vertical divider, no boxes, no Countries */}
-            <div className="flex items-center gap-0">
-              <div className="flex flex-col">
+            {/* FIX 2: Stats centered on mobile */}
+            <div className="flex items-center justify-center sm:justify-start gap-0">
+              <div className="flex flex-col items-center sm:items-start">
                 <span className="font-inter font-bold text-2xl text-white leading-tight">500+</span>
                 <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Athletes matched</span>
               </div>
               <div className="mx-5 self-stretch" style={{ width: '1px', background: 'rgba(255,255,255,0.15)' }} />
-              <div className="flex flex-col">
+              <div className="flex flex-col items-center sm:items-start">
                 <span className="font-inter font-bold text-2xl text-white leading-tight">2</span>
                 <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Sports</span>
               </div>
@@ -144,7 +148,7 @@ export default function Home() {
           </div>
 
           <div className="flex flex-col gap-4 lg:pt-8">
-            {/* CHANGE 2: Inline header with divider — no box, no "TOP MATCHES" label */}
+            {/* Inline header with divider */}
             <div className="flex items-center gap-2 mb-1">
               <span className="font-inter font-semibold text-[10px] tracking-[0.18em] uppercase shrink-0" style={{ color: '#D4880A' }}>
                 WHAT TO EXPECT
@@ -158,24 +162,23 @@ export default function Home() {
             <HeroProfileCard name="Ayesha N." city="Bangalore" sport="Marathon" matchPct={74} delay={0.25} />
             <HeroProfileCard name="Vikram T." city="Mumbai" sport="HYROX + Marathon" matchPct={68} delay={0.4} />
 
-            {/* CHANGE 3: Mobile-safe GrapeLabs link */}
-            <div className="text-center mt-2 px-2">
+            {/* FIX 3: GrapeLabs badge — tighter, no wrapping, consistent sizing */}
+            <div className="flex justify-center mt-2">
               <a
                 href="https://www.grapelabs.in"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-inter font-medium uppercase tracking-wider whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-inter font-medium uppercase tracking-wider"
                 style={{
                   fontSize: '10px',
                   color: '#7C6FD4',
                   background: 'rgba(124,111,212,0.10)',
-                  border: '1px solid rgba(124,111,212,0.25)'
+                  border: '1px solid rgba(124,111,212,0.25)',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                BUILT USING AI-POWERED SYSTEMS BY&nbsp;
-                <span style={{ textTransform: 'none' }}>GrapeLabs</span>&nbsp;
-                <span style={{ color: '#D4880A' }}>AI</span>
-                <ExternalLink size={10} />
+                BUILT USING AI-POWERED SYSTEMS BY&nbsp;<span style={{ textTransform: 'none', color: '#7C6FD4' }}>GrapeLabs</span>&nbsp;<span style={{ textTransform: 'none', color: '#D4880A' }}>AI</span>
+                <ExternalLink size={10} style={{ flexShrink: 0 }} />
               </a>
             </div>
           </div>
