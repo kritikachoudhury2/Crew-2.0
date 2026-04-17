@@ -17,7 +17,7 @@ export default function About() {
           <h2 className="font-inter font-bold text-2xl sm:text-3xl text-white tracking-tight mb-6">Built by GrapeLabs <span style={{ color: '#D4880A' }}>AI</span></h2>
 
           <p className="font-inter text-base mb-12" style={{ color: 'rgba(255,255,255,0.7)', lineHeight: 1.8 }}>
-            GrapeLabs AI automates the repetitive work that slows businesses down: orders, leads, follow-ups, payments, internal workflows. We build AI-powered systems that run in the background so teams can focus on what actually matters. CREW is what we build for fun.
+            GrapeLabs AI automates the repetitive work that slows businesses down: orders, leads, follow-ups, payments, internal workflows. We build AI-powered systems that run in the background so teams can focus on what actually matters. CREW is what we built for fun.
           </p>
 
           <div className="rounded-[20px] p-8 border mb-12" style={{ background: 'rgba(42,26,69,0.60)', borderColor: 'rgba(74,61,143,0.25)' }}>
