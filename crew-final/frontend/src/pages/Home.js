@@ -116,7 +116,7 @@ export default function Home() {
               Find your people.<br />Race your best.
             </h1>
             <p className="font-inter text-base md:text-lg mb-8 max-w-[480px] leading-relaxed" style={{ color: 'rgba(255,255,255,0.7)' }}>
-              Connect with HYROX and Marathon athletes who train at your level, chase the same race, and show up like you do.
+              Connect with HYROX and Marathon athletes who train at your level, chase the same race, and show up like you do. Train smarter, push harder, and stay race-ready together.
             </p>
 
             {/* FIX 1: Full-width stacked buttons on mobile, inline on sm+ */}
