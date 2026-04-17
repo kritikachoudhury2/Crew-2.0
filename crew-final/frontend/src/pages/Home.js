@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowRight, Users, Trophy, Zap, ChevronRight, ExternalLink } from 'lucide-react';
+import { ArrowRight, Zap, ChevronRight, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 function GradientAvatar({ name, size = 48 }) {
@@ -21,7 +21,6 @@ function HeroProfileCard({ name, city, sport, matchPct, delay }) {
     <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay }}
       className="rounded-[20px] p-4 backdrop-blur-xl border"
       style={{ background: 'rgba(42,26,69,0.80)', borderColor: 'rgba(74,61,143,0.30)' }}>
-      {/* PATCH 2: min-w-0 + flex-1 + truncate to fix mobile overflow */}
       <div className="flex items-center gap-3 mb-3 min-w-0">
         <GradientAvatar name={name} size={40} />
         <div className="min-w-0 flex-1">
@@ -129,31 +128,54 @@ export default function Home() {
                 See How It Works
               </Link>
             </div>
-            {/* PATCH 4: gap-3 → gap-2 for better mobile wrapping */}
-            <div className="flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-pill font-inter font-medium text-[13px]"
-                style={{ color: 'rgba(255,255,255,0.8)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                <Users size={14} /> 500+ Athletes matched
-              </span>
-              <span className="inline-flex items-center gap-2 px-4 py-2 rounded-pill font-inter font-medium text-[13px]"
-                style={{ color: 'rgba(255,255,255,0.8)', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}>
-                <Zap size={14} /> 2 Sports
-              </span>
+
+            {/* CHANGE 1: Stats as plain text separated by a thin vertical divider, no boxes, no Countries */}
+            <div className="flex items-center gap-0">
+              <div className="flex flex-col">
+                <span className="font-inter font-bold text-2xl text-white leading-tight">500+</span>
+                <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Athletes matched</span>
+              </div>
+              <div className="mx-5 self-stretch" style={{ width: '1px', background: 'rgba(255,255,255,0.15)' }} />
+              <div className="flex flex-col">
+                <span className="font-inter font-bold text-2xl text-white leading-tight">2</span>
+                <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Sports</span>
+              </div>
             </div>
           </div>
+
           <div className="flex flex-col gap-4 lg:pt-8">
-            <p className="font-inter text-xs px-3 py-2 rounded-[10px] text-center"
-              style={{ background: 'rgba(74,61,143,0.20)', color: 'rgba(255,255,255,0.45)', border: '1px solid rgba(74,61,143,0.25)' }}>
-              Example profiles — sign up to see real athletes near you.
-            </p>
+            {/* CHANGE 2: Inline header with divider — no box, no "TOP MATCHES" label */}
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-inter font-semibold text-[10px] tracking-[0.18em] uppercase shrink-0" style={{ color: '#D4880A' }}>
+                WHAT TO EXPECT
+              </span>
+              <div className="flex-1 h-px" style={{ background: 'rgba(212,136,10,0.25)' }} />
+              <span className="font-inter text-[10px] shrink-0" style={{ color: 'rgba(255,255,255,0.35)' }}>
+                sign up to see real matches near you
+              </span>
+            </div>
             <HeroProfileCard name="Arjun M." city="Delhi" sport="HYROX" matchPct={87} delay={0.1} />
             <HeroProfileCard name="Ayesha N." city="Bangalore" sport="Marathon" matchPct={74} delay={0.25} />
             <HeroProfileCard name="Vikram T." city="Mumbai" sport="HYROX + Marathon" matchPct={68} delay={0.4} />
-            <div className="text-center mt-2">
-              <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider"
-                style={{ color: '#7C6FD4', background: 'rgba(124,111,212,0.10)', border: '1px solid rgba(124,111,212,0.25)' }}>
-                BUILT USING AI-POWERED SYSTEMS BY <span style={{ textTransform: 'none' }}>GrapeLabs</span> <span style={{ color: '#D4880A' }}>AI</span> <ExternalLink size={12} />
+
+            {/* CHANGE 3: Mobile-safe GrapeLabs link */}
+            <div className="text-center mt-2 px-2">
+              <a
+                href="https://www.grapelabs.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-inter font-medium uppercase tracking-wider whitespace-nowrap"
+                style={{
+                  fontSize: '10px',
+                  color: '#7C6FD4',
+                  background: 'rgba(124,111,212,0.10)',
+                  border: '1px solid rgba(124,111,212,0.25)'
+                }}
+              >
+                BUILT USING AI-POWERED SYSTEMS BY&nbsp;
+                <span style={{ textTransform: 'none' }}>GrapeLabs</span>&nbsp;
+                <span style={{ color: '#D4880A' }}>AI</span>
+                <ExternalLink size={10} />
               </a>
             </div>
           </div>
@@ -162,22 +184,8 @@ export default function Home() {
 
       <Marquee />
 
-      {/* STATS */}
-      <section className="py-10 px-6 md:px-12" style={{ background: '#2A1A45' }}>
-        <div className="max-w-7xl mx-auto flex flex-wrap justify-center gap-4">
-          <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}>
-            <Users size={16} style={{ color: 'rgba(255,255,255,0.85)' }} />
-            <span className="font-inter font-medium text-sm" style={{ color: 'rgba(255,255,255,0.85)' }}>500+ Athletes matched</span>
-          </div>
-          <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-pill" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}>
-            <Trophy size={16} style={{ color: 'rgba(255,255,255,0.85)' }} />
-            <span className="font-inter font-medium text-sm" style={{ color: 'rgba(255,255,255,0.85)' }}>HYROX and Marathon</span>
-          </div>
-        </div>
-      </section>
-
       {/* HOW IT WORKS */}
-      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#1C0A30' }}>
+      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#2A1A45' }}>
         <div className="max-w-7xl mx-auto">
           <span className="block font-inter font-semibold text-xs tracking-[0.2em] uppercase mb-3" style={{ color: '#D4880A' }}>SIMPLE BY DESIGN</span>
           <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-12">
@@ -206,7 +214,7 @@ export default function Home() {
       </section>
 
       {/* SPORT CARDS */}
-      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#2A1A45' }}>
+      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#1C0A30' }}>
         <div className="max-w-7xl mx-auto">
           <span className="block font-inter font-semibold text-xs tracking-[0.2em] uppercase mb-3" style={{ color: '#D4880A' }}>BUILT FOR EVERY ENDURANCE ATHLETE</span>
           <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-12">Pick your sport. Find your people.</h2>
@@ -223,8 +231,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* PATCH 1: Athletes already on CREW — updated heading + disclaimer note */}
-      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#1C0A30' }}>
+      {/* ATHLETES ON CREW */}
+      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#2A1A45' }}>
         <div className="max-w-7xl mx-auto">
           <span className="block font-inter font-semibold text-xs tracking-[0.2em] uppercase mb-3" style={{ color: '#D4880A' }}>ATHLETES ON CREW</span>
           <h2 className="font-inter font-bold text-2xl sm:text-3xl lg:text-4xl text-white tracking-tight mb-2">Already training with us.</h2>
@@ -302,7 +310,7 @@ export default function Home() {
       </section>
 
       {/* UPCOMING EVENTS */}
-      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#2A1A45' }}>
+      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#1C0A30' }}>
         <div className="max-w-7xl mx-auto">
           <h2 className="font-inter font-bold text-2xl sm:text-3xl text-white tracking-tight mb-10">Races worth training for.</h2>
           {events.length > 0 ? (
@@ -342,7 +350,7 @@ export default function Home() {
       </section>
 
       {/* GRAPELABS CTA */}
-      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#1C0A30', borderTop: '1px solid rgba(74,61,143,0.20)' }}>
+      <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#2A1A45', borderTop: '1px solid rgba(74,61,143,0.20)' }}>
         <div className="max-w-4xl mx-auto text-center">
           <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-pill font-inter font-medium text-[11px] uppercase tracking-wider mb-6"
             style={{ color: '#F0A500', background: 'rgba(240,165,0,0.08)', border: '1px solid rgba(240,165,0,0.25)' }}>
