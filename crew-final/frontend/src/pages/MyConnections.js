@@ -19,8 +19,7 @@ function GradientAvatar({ name, size = 44 }) {
 
 const parseSport = (s) => { try { return typeof s === 'string' ? JSON.parse(s) : s || []; } catch { return [s]; } };
 const sportBadge = (s) => ({ hyrox: { bg: '#4A3D8F', l: 'HYROX' }, marathon: { bg: '#D4880A', l: 'MARATHON' } }[s] || { bg: '#4A3D8F', l: s?.toUpperCase() });
-
-const WHATSAPP_MSG = encodeURIComponent("Hey! We matched on CREW. Looks like we’re training for similar goals. Want to connect?");
+const WHATSAPP_MSG = encodeURIComponent("Hey! We matched on CREW. Looks like we're training for similar goals. Want to connect?");
 
 function WhatsAppButton({ phone, name }) {
   const clean = (phone || '').replace(/\D/g, '');
@@ -47,7 +46,7 @@ function WhatsAppButton({ phone, name }) {
 export default function MyConnections() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
-const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
+  const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
   const [matches, setMatches] = useState([]);
   const [sentReqs, setSentReqs] = useState([]);
   const [recvReqs, setRecvReqs] = useState([]);
@@ -55,10 +54,17 @@ const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
   const [loading, setLoading] = useState(true);
   const [dailyCount, setDailyCount] = useState(0);
 
+  // Sync tab from URL param changes (e.g. when navigating from FindAPartner "Respond to Request")
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t) setTab(t);
+  }, [searchParams]);
+
   const fetchAll = useCallback(async () => {
     if (!user) return;
     setLoading(true);
 
+    // Fetch matches with partner profiles individually (RLS-safe)
     const { data: matchRows, error: matchErr } = await supabase
       .from('matches')
       .select('id, created_at, user1_id, user2_id')
@@ -81,10 +87,14 @@ const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
     const [sRes, rvRes, svRes, countRes] = await Promise.all([
       supabase.from('connect_requests')
         .select('*, to_profile:profiles!to_user_id(id, name, city, sport, photo_url)')
-        .eq('from_user_id', user.id).eq('status', 'pending'),
+        .eq('from_user_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false }),
       supabase.from('connect_requests')
         .select('*, from_profile:profiles!from_user_id(id, name, city, sport, photo_url)')
-        .eq('to_user_id', user.id).eq('status', 'pending'),
+        .eq('to_user_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false }),
       supabase.from('saved_profiles')
         .select('*, saved:profiles!saved_user_id(id, name, city, sport, photo_url)')
         .eq('user_id', user.id),
@@ -94,8 +104,19 @@ const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
         .gte('created_at', new Date(Date.now() - 86400000).toISOString()),
     ]);
 
+    // Deduplicate sent requests: keep only the most recent per to_user_id
+    // This handles any duplicates that slipped through before the DB constraint was added
+    const rawSent = sRes.data || [];
+    const seenToUser = new Set();
+    const dedupedSent = rawSent.filter(r => {
+      if (!r.to_profile?.id) return false; // skip orphaned requests
+      if (seenToUser.has(r.to_profile.id)) return false;
+      seenToUser.add(r.to_profile.id);
+      return true;
+    });
+
     setMatches(matchesWithPartners.filter(m => m.partner));
-    setSentReqs(sRes.data || []);
+    setSentReqs(dedupedSent);
     setRecvReqs(rvRes.data || []);
     setSaved(svRes.data || []);
     setDailyCount(countRes.count || 0);
@@ -106,26 +127,35 @@ const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
 
   useEffect(() => {
     if (!user) return;
-    const connectSub = supabase.channel('cr_changes')
+    const connectSub = supabase.channel('cr_changes_myconn')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'connect_requests' }, fetchAll)
       .subscribe();
-    const matchSub = supabase.channel('m_changes')
+    const matchSub = supabase.channel('m_changes_myconn')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, fetchAll)
       .subscribe();
-    return () => { supabase.removeChannel(connectSub); supabase.removeChannel(matchSub); };
+    return () => {
+      supabase.removeChannel(connectSub);
+      supabase.removeChannel(matchSub);
+    };
   }, [user, fetchAll]);
 
   const handleAccept = async (req) => {
     const { error: updateErr } = await supabase.from('connect_requests')
       .update({ status: 'accepted' }).eq('id', req.id);
     if (updateErr) { toast.error('Could not accept request.'); return; }
+
+    // Check if match already exists before inserting
     const { data: existing } = await supabase.from('matches').select('id')
       .or(`and(user1_id.eq.${req.from_user_id},user2_id.eq.${req.to_user_id}),and(user1_id.eq.${req.to_user_id},user2_id.eq.${req.from_user_id})`)
       .maybeSingle();
+
     if (!existing) {
       const { error: matchErr } = await supabase.from('matches')
         .insert({ user1_id: req.from_user_id, user2_id: req.to_user_id });
-      if (matchErr) { toast.error('Could not create match.'); return; }
+      if (matchErr && matchErr.code !== '23505') {
+        toast.error('Could not create match.');
+        return;
+      }
     }
     toast.success('Connection accepted!');
     fetchAll();
@@ -157,31 +187,25 @@ const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
     { id: 'saved', label: 'Saved', count: saved.length },
   ];
 
-  // FIXED: card layout — avatar + info stacked vertically on mobile,
-  // action button always on its own row to prevent overlap
+  // Single-line card: avatar + name + sport badges | action on the right
   const ProfileCard = ({ p, actions }) => (
-    <div className="rounded-[16px] p-4 border"
+    <div className="rounded-[16px] p-4 border flex items-center gap-3"
       style={{ background: 'rgba(42,26,69,0.60)', borderColor: 'rgba(74,61,143,0.30)' }}>
-      <div className="flex items-center gap-3">
-        {p?.photo_url
-          ? <img src={p.photo_url} alt={p.name} className="w-11 h-11 rounded-full object-cover shrink-0" />
-          : <GradientAvatar name={p?.name} />}
-        <div className="flex-1 min-w-0">
-          <Link to={`/athlete/${p?.id}`} className="font-inter font-semibold text-sm text-white block truncate">
-            {p?.name || 'Unknown'}
-          </Link>
-          <div className="flex flex-wrap items-center gap-1 mt-0.5">
-            {parseSport(p?.sport).filter(s => s !== 'ironman').map(s => {
-              const b = sportBadge(s);
-              return <span key={s} className="px-1.5 py-0.5 rounded-pill text-[9px] font-inter font-bold text-white shrink-0" style={{ background: b.bg }}>{b.l}</span>;
-            })}
-            {/* City on its own line to avoid overlap with action buttons */}
-            <span className="font-inter text-[10px] w-full mt-0.5" style={{ color: 'rgba(255,255,255,0.4)' }}>{p?.city}</span>
-          </div>
+      {p?.photo_url
+        ? <img src={p.photo_url} alt={p.name} className="w-11 h-11 rounded-full object-cover shrink-0" />
+        : <GradientAvatar name={p?.name} />}
+      <div className="flex-1 min-w-0">
+        <Link to={`/athlete/${p?.id}`} className="font-inter font-semibold text-sm text-white block truncate">
+          {p?.name || 'Unknown'}
+        </Link>
+        <div className="flex flex-wrap items-center gap-1 mt-0.5">
+          {parseSport(p?.sport).filter(s => s !== 'ironman').map(s => {
+            const b = sportBadge(s);
+            return <span key={s} className="px-1.5 py-0.5 rounded-pill text-[9px] font-inter font-bold text-white shrink-0" style={{ background: b.bg }}>{b.l}</span>;
+          })}
         </div>
       </div>
-      {/* Actions always on their own row — no overlap possible */}
-      <div className="flex items-center gap-2 mt-3 justify-end">{actions}</div>
+      <div className="flex items-center gap-2 shrink-0">{actions}</div>
     </div>
   );
 
@@ -202,12 +226,11 @@ const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
             )}
           </div>
 
-          {/* Privacy banner */}
           <div className="rounded-[12px] p-3 mb-6 flex items-start gap-2"
             style={{ background: 'rgba(74,61,143,0.20)', border: '1px solid rgba(74,61,143,0.30)' }}>
             <ShieldCheck size={15} className="shrink-0 mt-0.5" style={{ color: '#A89CC8' }} />
             <p className="font-inter text-[11px]" style={{ color: '#A89CC8' }}>
-              Your phone number is never shared publicly. WhatsApp opens only after both athletes accept each other's request — until then, your contact details remain completely private.
+              Your phone number is never shared publicly. WhatsApp opens only after both athletes accept each other's request.
             </p>
           </div>
 
@@ -220,20 +243,30 @@ const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
                   color: tab === t.id ? '#fff' : 'rgba(255,255,255,0.6)',
                   border: tab === t.id ? '2px solid #D4880A' : '2px solid rgba(74,61,143,0.30)',
                 }}>
-                {t.label} {t.count > 0 && <span className="ml-1.5 text-[10px]">({t.count})</span>}
+                {t.label}
+                {t.count > 0 && (
+                  <span className="ml-1.5 text-[10px]">({t.count})</span>
+                )}
               </button>
             ))}
           </div>
 
           {loading ? (
-            <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 rounded-[16px] animate-pulse" style={{ background: 'rgba(42,26,69,0.40)' }} />)}</div>
+            <div className="space-y-3">
+              {[1,2,3].map(i => <div key={i} className="h-16 rounded-[16px] animate-pulse" style={{ background: 'rgba(42,26,69,0.40)' }} />)}
+            </div>
           ) : (
             <div className="space-y-3">
               {tab === 'matches' && (matches.length > 0 ? matches.map(m => (
                 <ProfileCard key={m.id} p={m.partner} actions={
                   <WhatsAppButton phone={m.partner?.phone} name={m.partner?.name} />
                 } />
-              )) : <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>No matches yet. Start connecting!</p>)}
+              )) : (
+                <div className="text-center py-12">
+                  <p className="font-inter text-sm text-white mb-1">No matches yet.</p>
+                  <p className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>Send a connection request — when someone accepts, they appear here.</p>
+                </div>
+              ))}
 
               {tab === 'received' && (recvReqs.length > 0 ? recvReqs.map(r => (
                 <ProfileCard key={r.id} p={r.from_profile} actions={<>
@@ -248,7 +281,9 @@ const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
                     <X size={13} />
                   </button>
                 </>} />
-              )) : <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>No pending requests.</p>)}
+              )) : (
+                <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>No pending requests.</p>
+              ))}
 
               {tab === 'sent' && (sentReqs.length > 0 ? sentReqs.map(r => (
                 <ProfileCard key={r.id} p={r.to_profile} actions={
@@ -258,7 +293,9 @@ const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
                     <Trash2 size={12} /> Withdraw
                   </button>
                 } />
-              )) : <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>No sent requests.</p>)}
+              )) : (
+                <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>No sent requests.</p>
+              ))}
 
               {tab === 'saved' && (saved.length > 0 ? saved.map(s => (
                 <ProfileCard key={s.id} p={s.saved} actions={
@@ -273,7 +310,9 @@ const [tab, setTab] = useState(searchParams.get('tab') || 'matches');
                     </button>
                   </div>
                 } />
-              )) : <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>No saved profiles.</p>)}
+              )) : (
+                <p className="font-inter text-sm" style={{ color: 'rgba(255,255,255,0.5)' }}>No saved profiles.</p>
+              ))}
             </div>
           )}
         </div>
