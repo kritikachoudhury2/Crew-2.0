@@ -14,6 +14,9 @@ const SPORTS = [
 const HYROX_STATIONS = ['SkiErg', 'Sled Push', 'Sled Pull', 'Burpee Broad Jump', 'Rowing', 'Farmers Carry', 'Sandbag Lunges', 'Wall Balls'];
 const CITIES = ['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa', 'Chennai', 'Kolkata', 'Other'];
 
+// Restrict input to digits and ":" only (time format like 26:30)
+const timeInputFilter = (val) => val.replace(/[^0-9:]/g, '');
+
 function RadioCard({ label, desc, selected, onClick }) {
   return (
     <button onClick={onClick} className="w-full text-left p-4 rounded-[16px] border-2 transition-all"
@@ -70,6 +73,28 @@ function NavButtons({ onBack, onNext, disabled, nextLabel = 'Next', showBack = t
   );
 }
 
+// Shared time input component — restricts to digits + ":" only
+function TimeInput({ label, value, onChange, placeholder, hint }) {
+  return (
+    <div>
+      <label className="font-inter text-xs font-medium text-white block mb-2">
+        {label}
+      </label>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={value || ''}
+        onChange={e => onChange(timeInputFilter(e.target.value))}
+        placeholder={placeholder}
+        maxLength={8}
+        className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
+        style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}
+      />
+      {hint && <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>{hint}</p>}
+    </div>
+  );
+}
+
 export default function GetStarted() {
   const { user, session, refreshProfile } = useAuth();
   const navigate = useNavigate();
@@ -83,6 +108,11 @@ export default function GetStarted() {
   const [error, setError] = useState('');
   const [events, setEvents] = useState([]);
   const [validationError, setValidationError] = useState('');
+
+  // ── SCROLL TO TOP ON EVERY STEP CHANGE ───────────────────────────────────
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [step]);
 
   const getStepSequence = useCallback((sports) => {
     const seq = ['sport-select'];
@@ -138,7 +168,6 @@ export default function GetStarted() {
   const upsertProfile = async (data) => {
     const uid = getUserId();
     if (!uid) { toast.error('Session expired. Please sign in again.'); return false; }
-
     const serialized = {};
     Object.entries(data).forEach(([key, val]) => {
       if (key.startsWith('_')) return;
@@ -150,7 +179,6 @@ export default function GetStarted() {
         serialized[key] = val;
       }
     });
-
     const { error: upsertError } = await supabase.from('profiles')
       .upsert({ id: uid, ...serialized, last_active: new Date().toISOString() }, { onConflict: 'id' });
     if (upsertError) {
@@ -240,7 +268,7 @@ export default function GetStarted() {
       bio: answers.bio || null,
       photo_url: answers.photo_url || null,
       email: session?.user?.email || user?.email || null,
-      // HYROX fields
+      // HYROX
       hyrox_target_race: answers.hyrox_target_race || null,
       hyrox_level: answers.hyrox_level || null,
       hyrox_race_goal: answers.hyrox_race_goal || null,
@@ -253,7 +281,7 @@ export default function GetStarted() {
       hyrox_weak: Array.isArray(answers.hyrox_weak) ? JSON.stringify(answers.hyrox_weak) : (answers.hyrox_weak || '[]'),
       hyrox_5k_time: answers.hyrox_5k_time || null,
       hyrox_10k_time: answers.hyrox_10k_time || null,
-      // Marathon fields
+      // Marathon
       marathon_target_race: answers.marathon_target_race || null,
       marathon_level: answers.marathon_level || null,
       marathon_race_goal: answers.marathon_goal || null,
@@ -265,17 +293,18 @@ export default function GetStarted() {
       marathon_pace: answers.marathon_pace || null,
       marathon_weekly_km: answers.marathon_weekly_km || null,
       marathon_goal: answers.marathon_goal || null,
+      marathon_5k_time: answers.marathon_5k_time || null,
       marathon_10k_time: answers.marathon_10k_time || null,
       // Shared fallbacks
-      target_race: answers.hyrox_target_race || answers.marathon_target_race || answers.target_race || null,
-      race_goal: answers.hyrox_race_goal || answers.marathon_goal || answers.race_goal || null,
-      training_days: answers.hyrox_training_days || answers.marathon_training_days || answers.training_days || null,
-      partner_goal: answers.hyrox_partner_goal || answers.marathon_partner_goal || answers.partner_goal || null,
-      partner_level_pref: answers.hyrox_partner_level_pref || answers.marathon_partner_level_pref || answers.partner_level_pref || null,
-      partner_gender_pref: answers.hyrox_partner_gender_pref || answers.marathon_partner_gender_pref || answers.partner_gender_pref || null,
+      target_race: answers.hyrox_target_race || answers.marathon_target_race || null,
+      race_goal: answers.hyrox_race_goal || answers.marathon_goal || null,
+      training_days: answers.hyrox_training_days || answers.marathon_training_days || null,
+      partner_goal: answers.hyrox_partner_goal || answers.marathon_partner_goal || null,
+      partner_level_pref: answers.hyrox_partner_level_pref || answers.marathon_partner_level_pref || null,
+      partner_gender_pref: answers.hyrox_partner_gender_pref || answers.marathon_partner_gender_pref || null,
       phone: answers._phoneNumber?.trim()
         ? `${answers._countryCode || '+91'}${answers._phoneNumber.trim()}`.replace(/\D/g, '')
-        : (answers.phone ? answers.phone.replace(/\D/g, '') : null),
+        : null,
       instagram: answers.instagram || null,
       flagged: false,
       last_active: new Date().toISOString(),
@@ -294,13 +323,9 @@ export default function GetStarted() {
   const update = (key, val) => { setValidationError(''); setAnswers(prev => ({ ...prev, [key]: val })); };
   const toggleArray = (key, val, maxSelect = null) => {
     const arr = Array.isArray(answers[key]) ? answers[key] : [];
-    if (arr.includes(val)) {
-      update(key, arr.filter(v => v !== val));
-    } else {
-      if (maxSelect && arr.length >= maxSelect) {
-        toast.error(`You can select up to ${maxSelect} options`);
-        return;
-      }
+    if (arr.includes(val)) { update(key, arr.filter(v => v !== val)); }
+    else {
+      if (maxSelect && arr.length >= maxSelect) { toast.error(`You can select up to ${maxSelect} options`); return; }
       update(key, [...arr, val]);
     }
   };
@@ -336,8 +361,7 @@ export default function GetStarted() {
         if (!answers.marathon_partner_level_pref) return 'Please choose your preferred partner level.';
         if (!answers.marathon_partner_gender_pref) return 'Please select your gender preference.';
         return '';
-      default:
-        return '';
+      default: return '';
     }
   };
 
@@ -378,7 +402,6 @@ export default function GetStarted() {
             </p>
             {!emailSent ? (
               <>
-                {/* Google sign-in button */}
                 <button
                   onClick={handleGoogleSignIn}
                   disabled={loading}
@@ -465,13 +488,8 @@ export default function GetStarted() {
             <div className="space-y-6">
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Which race are you targeting?</label>
-                {/* FIX: value="Not sure yet" so it saves properly */}
                 <select value={answers.hyrox_target_race || ''}
-                  onChange={e => {
-                    const val = e.target.value || null;
-                    update('hyrox_target_race', val);
-                    update('target_race', val);
-                  }}
+                  onChange={e => { const val = e.target.value || null; update('hyrox_target_race', val); update('target_race', val); }}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
                   <option value="Not sure yet">Not sure yet</option>
@@ -504,8 +522,7 @@ export default function GetStarted() {
                   onToggle={v => {
                     update('_hyrox_exp', v);
                     const map = { '0 — this is my first': 'rookie', '1–2': 'intermediate', '3–5': 'advanced', '5+': 'elite' };
-                    update('hyrox_level', map[v]);
-                    update('level', map[v]);
+                    update('hyrox_level', map[v]); update('level', map[v]);
                   }} />
               </div>
             </div>
@@ -549,25 +566,21 @@ export default function GetStarted() {
                   ))}
                 </div>
               </div>
-              <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">
-                  5km run time <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
-                </label>
-                <input type="text" value={answers.hyrox_5k_time || ''} onChange={e => update('hyrox_5k_time', e.target.value)}
-                  placeholder="e.g. 26:30"
-                  className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
-                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
-              </div>
-              {/* NEW: 10K time for HYROX */}
-              <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">
-                  10K run time <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
-                </label>
-                <input type="text" value={answers.hyrox_10k_time || ''} onChange={e => update('hyrox_10k_time', e.target.value)}
-                  placeholder="e.g. 55:00"
-                  className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
-                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
-              </div>
+              {/* HYROX time fields — digits + ":" only */}
+              <TimeInput
+                label={<>5km run time <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span></>}
+                value={answers.hyrox_5k_time}
+                onChange={v => update('hyrox_5k_time', v)}
+                placeholder="e.g. 26:30"
+                hint="Format: mm:ss"
+              />
+              <TimeInput
+                label={<>10K run time <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span></>}
+                value={answers.hyrox_10k_time}
+                onChange={v => update('hyrox_10k_time', v)}
+                placeholder="e.g. 55:00"
+                hint="Format: mm:ss"
+              />
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Training days per week <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['1–2 days', '3–4 days', '5–6 days', 'Every day']}
@@ -598,14 +611,14 @@ export default function GetStarted() {
             <div className="space-y-6">
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">
-                  What are your strengths? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional — select up to 3)</span>
+                  What are your strengths? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional — up to 3)</span>
                 </label>
                 <ChipSelect options={HYROX_STATIONS} selected={answers.hyrox_strong || []}
                   onToggle={v => toggleArray('hyrox_strong', v, 3)} maxSelect={3} />
               </div>
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">
-                  Where do you want to improve? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional — select up to 3)</span>
+                  Where do you want to improve? <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional — up to 3)</span>
                 </label>
                 <ChipSelect options={HYROX_STATIONS} selected={answers.hyrox_weak || []}
                   onToggle={v => toggleArray('hyrox_weak', v, 3)} maxSelect={3} />
@@ -661,13 +674,8 @@ export default function GetStarted() {
               </div>
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">Target race</label>
-                {/* FIX: value="Not targeting one yet" so it saves properly */}
                 <select value={answers.marathon_target_race || ''}
-                  onChange={e => {
-                    const val = e.target.value || null;
-                    update('marathon_target_race', val);
-                    if (!answers.hyrox_target_race) update('target_race', val);
-                  }}
+                  onChange={e => { const val = e.target.value || null; update('marathon_target_race', val); if (!answers.hyrox_target_race) update('target_race', val); }}
                   className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white outline-none"
                   style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }}>
                   <option value="Not targeting one yet">Not targeting one yet</option>
@@ -716,7 +724,7 @@ export default function GetStarted() {
                   ))}
                 </div>
               </div>
-              {/* FIX: pace only shown for Half/Full Marathon */}
+              {/* Pace — only for Half/Full Marathon */}
               {(answers.marathon_distance === 'Half Marathon' || answers.marathon_distance === 'Full Marathon') && (
                 <div>
                   <label className="font-inter text-xs font-medium text-white block mb-2">
@@ -729,16 +737,21 @@ export default function GetStarted() {
                   <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.4)' }}>Your easy pace, not race pace.</p>
                 </div>
               )}
-              {/* NEW: 10K personal best for Marathon */}
-              <div>
-                <label className="font-inter text-xs font-medium text-white block mb-2">
-                  10K personal best <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span>
-                </label>
-                <input type="text" value={answers.marathon_10k_time || ''} onChange={e => update('marathon_10k_time', e.target.value)}
-                  placeholder="e.g. 55:00"
-                  className="w-full px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
-                  style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
-              </div>
+              {/* Marathon time fields — digits + ":" only, same style as screenshot */}
+              <TimeInput
+                label={<>5km run time <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span></>}
+                value={answers.marathon_5k_time}
+                onChange={v => update('marathon_5k_time', v)}
+                placeholder="e.g. 26:30"
+                hint="Format: mm:ss"
+              />
+              <TimeInput
+                label={<>10K run time <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 400 }}>(optional)</span></>}
+                value={answers.marathon_10k_time}
+                onChange={v => update('marathon_10k_time', v)}
+                placeholder="e.g. 55:00"
+                hint="Format: mm:ss"
+              />
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-2">What's your avg weekly distance? <span style={{ color: '#D4880A' }}>*</span></label>
                 <ChipSelect options={['Under 20km', '20–40km', '40–60km', '60–80km', '80km+']}
@@ -861,9 +874,7 @@ export default function GetStarted() {
                     className="flex-1 px-4 py-3 rounded-[12px] font-inter text-sm text-white placeholder:text-gray-500 outline-none"
                     style={{ background: 'rgba(42,26,69,0.60)', border: '1px solid rgba(74,61,143,0.30)' }} />
                 </div>
-                <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>
-                  Never shown publicly. Only used after a mutual match.
-                </p>
+                <p className="font-inter text-[11px] mt-1" style={{ color: 'rgba(255,255,255,0.35)' }}>Never shown publicly. Only used after a mutual match.</p>
               </div>
               <div>
                 <label className="font-inter text-xs font-medium text-white block mb-1.5">
