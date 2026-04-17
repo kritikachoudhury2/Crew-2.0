@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
+import { MessageCircle, Mail, MapPin } from 'lucide-react';
 
 function CrewLogo() {
   return (
-    <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer" data-testid="footer-logo-link" className="inline-flex flex-col leading-none gap-1">
+    <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer" className="inline-flex flex-col leading-none gap-1">
       <span className="font-inter font-[800] text-3xl tracking-tight text-white" style={{ letterSpacing: '-1.5px' }}>CREW</span>
       <span className="font-inter font-normal text-sm" style={{ color: '#6B5FA0' }}>
-        by GrapeLabs <span style={{ color: '#D4880A' }}>AI</span>
+        by GrapeLabs{' '}<span style={{ color: '#D4880A' }}>AI</span>
       </span>
     </a>
   );
@@ -37,7 +38,7 @@ export default function Footer() {
                 { to: '/about', label: 'About Us' },
               ].map(l => (
                 <Link key={l.to} to={l.to} className="font-inter text-sm transition-colors hover:text-amber-brand"
-                  style={{ color: 'rgba(255,255,255,0.5)' }} data-testid={`footer-link-${l.to.slice(1)}`}>
+                  style={{ color: 'rgba(255,255,255,0.5)' }}>
                   {l.label}
                 </Link>
               ))}
@@ -45,23 +46,42 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="font-inter font-semibold text-sm mb-4" style={{ color: '#fff' }}>Legal</h4>
+            <h4 className="font-inter font-semibold text-sm mb-4" style={{ color: '#fff' }}>Contact Us</h4>
             <div className="flex flex-col gap-3">
-              <Link to="/privacy-policy" className="font-inter text-sm transition-colors hover:text-amber-brand"
-                style={{ color: 'rgba(255,255,255,0.5)' }} data-testid="footer-link-privacy">
-                Privacy Policy
-              </Link>
-              <Link to="/terms" className="font-inter text-sm transition-colors hover:text-amber-brand"
-                style={{ color: 'rgba(255,255,255,0.5)' }} data-testid="footer-link-terms">
-                Terms &amp; Conditions
-              </Link>
+              <a href="https://wa.me/918388892300" target="_blank" rel="noopener noreferrer"
+                className="font-inter text-sm flex items-center gap-2 transition-colors hover:text-white"
+                style={{ color: 'rgba(255,255,255,0.5)' }}>
+                <MessageCircle size={13} style={{ color: '#25D366', flexShrink: 0 }} />
+                +91 83888 92300
+              </a>
+              <a href="mailto:mycrew.find@gmail.com"
+                className="font-inter text-sm flex items-center gap-2 transition-colors hover:text-white"
+                style={{ color: 'rgba(255,255,255,0.5)' }}>
+                <Mail size={13} style={{ color: '#D4880A', flexShrink: 0 }} />
+                mycrew.find@gmail.com
+              </a>
+              <p className="font-inter text-sm flex items-start gap-2"
+                style={{ color: 'rgba(255,255,255,0.5)' }}>
+                <MapPin size={13} style={{ color: '#6B5FA0', flexShrink: 0, marginTop: 2 }} />
+                Green Park Extension, New Delhi 110016
+              </p>
+              <div className="pt-1 border-t" style={{ borderColor: 'rgba(74,61,143,0.20)' }}>
+                <Link to="/privacy-policy" className="font-inter text-sm block mb-2 transition-colors hover:text-amber-brand"
+                  style={{ color: 'rgba(255,255,255,0.5)' }}>
+                  Privacy Policy
+                </Link>
+                <Link to="/terms" className="font-inter text-sm block transition-colors hover:text-amber-brand"
+                  style={{ color: 'rgba(255,255,255,0.5)' }}>
+                  Terms &amp; Conditions
+                </Link>
+              </div>
             </div>
           </div>
         </div>
 
         <div className="border-t pt-8" style={{ borderColor: 'rgba(74,61,143,0.20)' }}>
           <p className="font-inter text-xs text-center" style={{ color: 'rgba(255,255,255,0.4)' }}>
-            &copy; 2026 GrapeLabs <span style={{ color: '#D4880A' }}>AI</span>. All rights reserved.
+            &copy; 2026 GrapeLabs{' '}<span style={{ color: '#D4880A' }}>AI</span>. All rights reserved.
           </p>
         </div>
       </div>
