@@ -120,32 +120,31 @@ export default function Home() {
             </p>
 
             {/* Buttons — full width on mobile, auto on sm+ */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-8">
-              <Link to="/get-started"
-                className="flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02]"
-                style={{ background: '#D4880A', color: '#fff' }}>
-                Find My Partner <ArrowRight size={16} />
-              </Link>
-              <Link to="/how-it-works"
-                className="flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3 rounded-pill font-inter font-semibold text-sm"
-                style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
-                See How It Works
-              </Link>
-            </div>
+<div className="flex flex-col sm:flex-row gap-3 mb-8">
+  <Link to="/get-started"
+    className="flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02]"
+    style={{ background: '#D4880A', color: '#fff' }}>
+    Find My Partner <ArrowRight size={16} />
+  </Link>
+  <Link to="/how-it-works"
+    className="flex items-center justify-center gap-2 w-full sm:w-auto px-7 py-3 rounded-pill font-inter font-semibold text-sm"
+    style={{ border: '2px solid #6B5FA0', color: '#fff' }}>
+    See How It Works
+  </Link>
+</div>
 
-            {/* Stats — always centered on all screen sizes */}
-            <div className="flex items-center justify-center gap-0">
-              <div className="flex flex-col items-center">
-                <span className="font-inter font-bold text-2xl text-white leading-tight">500+</span>
-                <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Athletes matched</span>
-              </div>
-              <div className="mx-5 self-stretch" style={{ width: '1px', background: 'rgba(255,255,255,0.15)' }} />
-              <div className="flex flex-col items-center">
-                <span className="font-inter font-bold text-2xl text-white leading-tight">2</span>
-                <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Sports</span>
-              </div>
-            </div>
-          </div>
+{/* Stats — centered relative to the two buttons */}
+<div className="flex items-center gap-0 self-start">
+  <div className="flex flex-col items-center">
+    <span className="font-inter font-bold text-2xl text-white leading-tight">500+</span>
+    <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Athletes matched</span>
+  </div>
+  <div className="mx-5 self-stretch" style={{ width: '1px', background: 'rgba(255,255,255,0.15)' }} />
+  <div className="flex flex-col items-center">
+    <span className="font-inter font-bold text-2xl text-white leading-tight">2</span>
+    <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Sports</span>
+  </div>
+</div>
 
           <div className="flex flex-col gap-4 lg:pt-8">
             {/* WHAT TO EXPECT — yellow line only, no trailing text */}
