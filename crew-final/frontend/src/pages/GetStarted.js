@@ -114,6 +114,16 @@ export default function GetStarted() {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [step]);
 
+  // b) Auto-populate marathon 5K/10K from HYROX if not already set
+  useEffect(() => {
+    if (step !== 'marathon-training') return;
+    setAnswers(prev => ({
+      ...prev,
+      marathon_5k_time: prev.marathon_5k_time || prev.hyrox_5k_time || '',
+      marathon_10k_time: prev.marathon_10k_time || prev.hyrox_10k_time || '',
+    }));
+  }, [step]);
+
   const getStepSequence = useCallback((sports) => {
     const seq = ['sport-select'];
     if (sports.includes('hyrox')) seq.push('hyrox-race', 'hyrox-fitness', 'hyrox-stations');
@@ -144,7 +154,11 @@ export default function GetStarted() {
       setEvents(evts || []);
       if (user) {
         const { data: prof } = await supabase.from('profiles').select('name').eq('id', user.id).single();
-        if (prof?.name?.trim()) { navigate('/find-a-partner'); return; }
+        if (prof?.name?.trim()) {
+          const rd = searchParams.get('redirect');
+          navigate(rd || '/find-a-partner', { replace: true });
+          return;
+        }
         const saved = localStorage.getItem('crew-onboarding-progress');
         if (saved) {
           try {
@@ -161,7 +175,7 @@ export default function GetStarted() {
       }
     };
     if (step === 'loading') init();
-  }, [user, navigate, step]);
+  }, [user, navigate, step, searchParams]);
 
   const getUserId = useCallback(() => session?.user?.id || user?.id || null, [session, user]);
 
