@@ -25,9 +25,6 @@ const sportBadge = (s) => {
 };
 const parseArr = (s) => { try { return typeof s === 'string' ? JSON.parse(s) : s || []; } catch { return []; } };
 
-// Append "mins" to a time value if it exists
-const withMins = (val) => val ? `${val} mins` : null;
-
 const FILTER_CITIES = ['Delhi', 'Mumbai', 'Bangalore', 'Hyderabad', 'Pune', 'Goa', 'Chennai', 'Kolkata', 'Other'];
 const FILTER_LEVELS = [
   { val: 'beginner', label: 'Beginner' },
@@ -194,15 +191,14 @@ export default function FindAPartner() {
   const clearFilters = () => setFilters({ sport: [], city: [], level: [], gender: [] });
   const activeCount = Object.values(filters).reduce((a, b) => a + b.length, 0);
 
-  // ── DETAIL LINE — shows times with "mins" suffix ──────────────────────────
+  // ── DETAIL LINE — values shown as-is, no "mins" suffix ───────────────────
   const getDetailLine = (p) => {
     const sports = parseSports(p.sport);
     if (sports.includes('hyrox')) {
       const parts = [];
-      if (p.hyrox_5k_time) parts.push(`5K: ${withMins(p.hyrox_5k_time)}`);
-      if (p.hyrox_10k_time) parts.push(`10K: ${withMins(p.hyrox_10k_time)}`);
+      if (p.hyrox_5k_time) parts.push(`5K: ${p.hyrox_5k_time}`);
+      if (p.hyrox_10k_time) parts.push(`10K: ${p.hyrox_10k_time}`);
       if (parts.length > 0) return parts.join(' · ');
-      // Fallback to stations if no times
       const strong = parseArr(p.hyrox_strong).slice(0, 2).join(', ');
       const weak = parseArr(p.hyrox_weak).slice(0, 1).join(', ');
       return `${strong ? `Strong: ${strong}` : ''}${weak ? ` · Working on: ${weak}` : ''}`;
@@ -211,8 +207,8 @@ export default function FindAPartner() {
       const parts = [];
       if (p.marathon_distance) parts.push(p.marathon_distance);
       if (p.marathon_pace) parts.push(`Pace: ${p.marathon_pace}/km`);
-      if (p.marathon_5k_time) parts.push(`5K: ${withMins(p.marathon_5k_time)}`);
-      if (p.marathon_10k_time) parts.push(`10K: ${withMins(p.marathon_10k_time)}`);
+      if (p.marathon_5k_time) parts.push(`5K: ${p.marathon_5k_time}`);
+      if (p.marathon_10k_time) parts.push(`10K: ${p.marathon_10k_time}`);
       if (p.marathon_weekly_km) parts.push(p.marathon_weekly_km);
       return parts.join(' · ');
     }
