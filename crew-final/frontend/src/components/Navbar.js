@@ -4,6 +4,13 @@ import { Menu, X, Users, LogOut, Search } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 
+// Helper — fires GA4 event safely even if gtag hasn't loaded yet
+function gtagEvent(eventName, params) {
+  if (typeof window.gtag === 'function') {
+    window.gtag('event', eventName, params);
+  }
+}
+
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, profile, signOut } = useAuth();
@@ -81,9 +88,17 @@ export default function Navbar() {
         {/* Logo */}
         <Link to="/" className="no-underline flex flex-col leading-none gap-0.5" onClick={() => setMobileOpen(false)}>
           <span className="font-inter font-[800] text-2xl tracking-tight" style={{ color: '#FFFFFF', letterSpacing: '-1px' }}>CREW</span>
+          {/* ── TRACKED: GrapeLabs AI logo link ── */}
           <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
             className="font-inter font-normal text-[11px] no-underline" style={{ color: '#6B5FA0' }}
-            onClick={e => e.stopPropagation()}>
+            onClick={e => {
+              e.stopPropagation();
+              gtagEvent('grapelabs_interest', {
+                click_location: 'navbar_logo',
+                link_text: 'by GrapeLabs AI',
+                destination: 'https://www.grapelabs.in',
+              });
+            }}>
             by GrapeLabs <span style={{ color: '#D4880A' }}>AI</span>
           </a>
         </Link>
@@ -93,7 +108,16 @@ export default function Navbar() {
           {navLinks.map(link => (
             <Link key={link.to} to={link.to}
               className="font-inter font-medium text-sm transition-colors duration-200"
-              style={{ color: isActive(link.to) ? '#D4880A' : 'rgba(255,255,255,0.75)' }}>
+              style={{ color: isActive(link.to) ? '#D4880A' : 'rgba(255,255,255,0.75)' }}
+              onClick={() => {
+                // ── TRACKED: About Us nav click ──
+                if (link.to === '/about') {
+                  gtagEvent('about_us_click', {
+                    click_location: 'navbar_desktop',
+                    link_text: 'About Us',
+                  });
+                }
+              }}>
               {link.label}
             </Link>
           ))}
@@ -171,7 +195,16 @@ export default function Navbar() {
         <div className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-6"
           style={{ background: '#1C0A30', top: '64px' }}>
           {navLinks.map(link => (
-            <Link key={link.to} to={link.to} onClick={() => setMobileOpen(false)}
+            <Link key={link.to} to={link.to} onClick={() => {
+              setMobileOpen(false);
+              // ── TRACKED: About Us mobile nav click ──
+              if (link.to === '/about') {
+                gtagEvent('about_us_click', {
+                  click_location: 'navbar_mobile',
+                  link_text: 'About Us',
+                });
+              }
+            }}
               className="font-inter font-semibold text-2xl"
               style={{ color: isActive(link.to) ? '#D4880A' : '#fff' }}>
               {link.label}
