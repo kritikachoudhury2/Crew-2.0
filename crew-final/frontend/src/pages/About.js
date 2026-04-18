@@ -1,7 +1,24 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Cpu, Workflow, Calendar } from 'lucide-react';
 
+// Helper — fires GA4 event safely even if gtag hasn't loaded yet
+function gtagEvent(eventName, params) {
+  if (typeof window.gtag === 'function') {
+    window.gtag('event', eventName, params);
+  }
+}
+
 export default function About() {
+
+  // ── TRACKED: About Us page view (fires once on mount) ──
+  useEffect(() => {
+    gtagEvent('about_us_page_view', {
+      page_title: 'About Us',
+      page_path: '/about',
+    });
+  }, []);
+
   return (
     <div data-testid="about-page">
       <section className="py-14 md:py-24 px-6 md:px-12" style={{ background: '#1C0A30' }}>
@@ -20,6 +37,8 @@ export default function About() {
             GrapeLabs AI automates the repetitive work that slows businesses down: orders, leads, follow-ups, payments, internal workflows. We build AI-powered systems that run in the background so teams can focus on what actually matters. CREW is what we built for fun.
           </p>
 
+          {/* ── TRACKED: "Built using AI-powered systems" section viewed — tracked via scroll/visibility if needed,
+               but the CTA click below is the key signal ── */}
           <div className="rounded-[20px] p-8 border mb-12" style={{ background: 'rgba(42,26,69,0.60)', borderColor: 'rgba(74,61,143,0.25)' }}>
             <h3 className="font-inter font-bold text-xl text-white mb-8">Built using AI-powered systems</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -58,9 +77,16 @@ export default function About() {
           </p>
 
           <div className="flex flex-col gap-3">
+            {/* ── TRACKED: "See What We Automate" CTA on About page ── */}
             <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
               className="inline-flex items-center gap-2 px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02] self-start"
-              style={{ background: '#D4880A', color: '#fff' }} data-testid="about-cta">
+              style={{ background: '#D4880A', color: '#fff' }}
+              data-testid="about-cta"
+              onClick={() => gtagEvent('grapelabs_interest', {
+                click_location: 'about_page_cta',
+                link_text: 'See What We Automate',
+                destination: 'https://www.grapelabs.in',
+              })}>
               See What We Automate <ArrowRight size={16} />
             </a>
           </div>
