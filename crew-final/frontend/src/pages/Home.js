@@ -4,6 +4,13 @@ import { motion } from 'framer-motion';
 import { ArrowRight, ChevronRight, ExternalLink } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
+// Helper — fires GA4 event safely even if gtag hasn't loaded yet
+function gtagEvent(eventName, params) {
+  if (typeof window.gtag === 'function') {
+    window.gtag('event', eventName, params);
+  }
+}
+
 function GradientAvatar({ name, size = 48 }) {
   const initials = (name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const colors = ['#4A3D8F', '#D4880A', '#6B5FA0', '#0F6E56', '#8B5CF6'];
@@ -136,7 +143,7 @@ export default function Home() {
               </Link>
             </div>
 
-            {/* Stats — FIX d): centered on mobile, no alignSelf constraint */}
+            {/* Stats */}
             <div className="flex items-center justify-center sm:justify-start">
               <div className="flex flex-col items-center">
                 <span className="font-inter font-bold text-2xl text-white leading-tight">500+</span>
@@ -163,9 +170,15 @@ export default function Home() {
             <HeroProfileCard name="Vikram T." city="Mumbai" sport="HYROX + Marathon" matchPct={68} delay={0.4} />
 
             <div className="flex justify-center mt-2">
+              {/* ── TRACKED: "Built using AI-powered systems by GrapeLabs AI" hero badge ── */}
               <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-inter font-medium uppercase tracking-wider"
-                style={{ fontSize: '10px', color: '#7C6FD4', background: 'rgba(124,111,212,0.10)', border: '1px solid rgba(124,111,212,0.25)', whiteSpace: 'nowrap' }}>
+                style={{ fontSize: '10px', color: '#7C6FD4', background: 'rgba(124,111,212,0.10)', border: '1px solid rgba(124,111,212,0.25)', whiteSpace: 'nowrap' }}
+                onClick={() => gtagEvent('grapelabs_interest', {
+                  click_location: 'home_hero_badge',
+                  link_text: 'BUILT USING AI-POWERED SYSTEMS BY GrapeLabs AI',
+                  destination: 'https://www.grapelabs.in',
+                })}>
                 BUILT USING AI-POWERED SYSTEMS BY&nbsp;
                 <span style={{ textTransform: 'none', color: '#7C6FD4' }}>GrapeLabs</span>&nbsp;
                 <span style={{ textTransform: 'none', color: '#D4880A' }}>AI</span>
@@ -330,9 +343,15 @@ export default function Home() {
           <p className="font-inter text-base mb-8 max-w-xl mx-auto" style={{ color: 'rgba(255,255,255,0.7)', lineHeight: 1.7 }}>
             GrapeLabs AI automates the day-to-day workflows slowing your team down — orders, leads, follow-ups, payments, and more. CREW is what we build for fun.
           </p>
+          {/* ── TRACKED: "See What We Automate" CTA in homepage GrapeLabs section ── */}
           <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-2 px-7 py-3 rounded-pill font-inter font-bold text-sm transition-all hover:scale-[1.02]"
-            style={{ background: '#D4880A', color: '#fff' }}>
+            style={{ background: '#D4880A', color: '#fff' }}
+            onClick={() => gtagEvent('grapelabs_interest', {
+              click_location: 'home_grapelabs_section',
+              link_text: 'See What We Automate',
+              destination: 'https://www.grapelabs.in',
+            })}>
             See What We Automate <ArrowRight size={16} />
           </a>
         </div>
