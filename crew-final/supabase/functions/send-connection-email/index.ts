@@ -142,7 +142,7 @@ Deno.serve(async (req) => {
           <a href="${acceptUrl}" style="display:inline-block;background:#25D366;color:#fff;padding:13px 24px;border-radius:999px;font-weight:700;font-size:14px;text-decoration:none;margin-right:8px;margin-bottom:8px;">Accept &amp; Connect Now</a>
           <a href="${APP_URL}/my-connections?tab=received" style="display:inline-block;background:transparent;color:#fff;padding:12px 24px;border-radius:999px;font-weight:600;font-size:14px;text-decoration:none;border:2px solid rgba(107,95,160,0.6);margin-bottom:8px;">View Full Profile on CREW</a>
         </div>
-        <p style="font-size:11px;color:rgba(255,255,255,0.3);margin:12px 0 0;line-height:1.5;">The Accept link works for 7 days. After that, accept from My Connections in the app.<br>You are receiving this because you have a CREW account.</p>
+        <p style="font-size:11px;color:rgba(255,255,255,0.3);margin:12px 0 0;line-height:1.5;">The Accept link works for 7 days. After that, accept from My Connections in the website.<br>You are receiving this because you have a CREW account.</p>
       </div>
     </div>
   </div>
