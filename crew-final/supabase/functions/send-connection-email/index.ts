@@ -8,7 +8,6 @@ const TOKEN_SECRET = Deno.env.get('ACCEPT_TOKEN_SECRET')!;
 const FROM_EMAIL = 'crew@crewbygrapelabs.in';
 const APP_URL = 'https://www.crewbygrapelabs.in';
 const EDGE_URL = `${SUPABASE_URL}/functions/v1/accept-and-connect`;
-
 const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 function generateToken(requestId: string, fromUserId: string, toUserId: string): string {
@@ -23,13 +22,7 @@ function parseSports(sport: string | null): string {
   try {
     const arr = JSON.parse(sport) as string[];
     return arr.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' & ');
-  } catch {
-    return sport;
-  }
-}
-
-function withMins(val: string | null): string {
-  return val ? `${val} mins` : '—';
+  } catch { return sport; }
 }
 
 function sportBadgeHtml(sport: string): string {
@@ -57,7 +50,6 @@ Deno.serve(async (req) => {
     if (!record) return new Response('No record', { status: 400 });
 
     const { id: requestId, from_user_id, to_user_id } = record;
-
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
     const [{ data: fromProfile }, { data: toProfile }] = await Promise.all([
@@ -94,8 +86,9 @@ Deno.serve(async (req) => {
 
     if (sports.includes('hyrox')) {
       statsRows += statRowHtml('Category', fromProfile?.hyrox_category ? fromProfile.hyrox_category.replace('_', ' ').toUpperCase() : null);
-      statsRows += statRowHtml('5K Time', fromProfile?.hyrox_5k_time ? withMins(fromProfile.hyrox_5k_time) : null);
-      statsRows += statRowHtml('10K Time', fromProfile?.hyrox_10k_time ? withMins(fromProfile.hyrox_10k_time) : null);
+      // a) Times shown as-is, no "mins" suffix
+      statsRows += statRowHtml('5K Time', fromProfile?.hyrox_5k_time || null);
+      statsRows += statRowHtml('10K Time', fromProfile?.hyrox_10k_time || null);
       statsRows += statRowHtml('Target Race', fromProfile?.hyrox_target_race || fromProfile?.target_race || null);
       statsRows += statRowHtml('Race Goal', fromProfile?.hyrox_race_goal || null);
       statsRows += statRowHtml('Training', fromProfile?.hyrox_training_days || fromProfile?.training_days || null);
@@ -103,35 +96,27 @@ Deno.serve(async (req) => {
     if (sports.includes('marathon')) {
       statsRows += statRowHtml('Distance', fromProfile?.marathon_distance || null);
       statsRows += statRowHtml('Pace', fromProfile?.marathon_pace ? `${fromProfile.marathon_pace}/km` : null);
-      statsRows += statRowHtml('5K Time', fromProfile?.marathon_5k_time ? withMins(fromProfile.marathon_5k_time) : null);
-      statsRows += statRowHtml('10K Time', fromProfile?.marathon_10k_time ? withMins(fromProfile.marathon_10k_time) : null);
+      // a) Times shown as-is, no "mins" suffix
+      statsRows += statRowHtml('5K Time', fromProfile?.marathon_5k_time || null);
+      statsRows += statRowHtml('10K Time', fromProfile?.marathon_10k_time || null);
       statsRows += statRowHtml('Target Race', fromProfile?.marathon_target_race || fromProfile?.target_race || null);
       statsRows += statRowHtml('Race Goal', fromProfile?.marathon_goal || null);
       statsRows += statRowHtml('Training', fromProfile?.marathon_training_days || fromProfile?.training_days || null);
     }
-    if (!statsRows) {
-      statsRows += statRowHtml('Looking for', fromProfile?.partner_goal || null);
-    }
+    if (!statsRows) statsRows += statRowHtml('Looking for', fromProfile?.partner_goal || null);
 
     const bioHtml = fromProfile?.bio
       ? `<p style="font-size:13px;color:rgba(255,255,255,0.65);line-height:1.6;margin:12px 0 0;font-style:italic;">"${fromProfile.bio}"</p>`
       : '';
-
     const levelBadge = fromProfile?.level
       ? `<span style="display:inline-block;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);font-size:10px;font-weight:500;padding:2px 8px;border-radius:999px;margin-left:4px;text-transform:capitalize;">${fromProfile.level}</span>`
       : '';
 
-    const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+    const emailHtml = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#ffffff;font-family:Inter,Arial,sans-serif;">
   <div style="max-width:520px;margin:32px auto;padding:16px;">
-
-    <!-- Card -->
     <div style="background:#1C0A30;border-radius:20px;overflow:hidden;">
-
-      <!-- Header -->
       <div style="padding:28px 32px 20px;">
         <div style="margin-bottom:20px;">
           <span style="font-size:26px;font-weight:800;color:#fff;letter-spacing:-1px;">CREW</span>
@@ -140,64 +125,28 @@ Deno.serve(async (req) => {
         <h2 style="font-size:20px;font-weight:700;color:#fff;margin:0 0 4px;">You have a new connection request!</h2>
         <p style="font-size:13px;color:rgba(255,255,255,0.55);margin:0;">${senderName} wants to train with you on CREW.</p>
       </div>
-
-      <!-- Divider -->
       <div style="height:1px;background:rgba(74,61,143,0.25);margin:0 32px;"></div>
-
-      <!-- Sender profile card -->
       <div style="padding:20px 32px 24px;">
-
-        <!-- Name + badges + level -->
         <div style="margin-bottom:8px;">
-          <span style="font-size:18px;font-weight:700;color:#fff;">${senderName}</span>
-          ${levelBadge}
+          <span style="font-size:18px;font-weight:700;color:#fff;">${senderName}</span>${levelBadge}
         </div>
-        <div style="margin-bottom:6px;">
-          ${sportBadges}
-        </div>
+        <div style="margin-bottom:6px;">${sportBadges}</div>
         ${senderLocation ? `<p style="font-size:12px;color:rgba(255,255,255,0.45);margin:0 0 12px;">📍 ${senderLocation}</p>` : ''}
-
-        <!-- Stats table -->
-        ${statsRows ? `
-        <div style="background:rgba(74,61,143,0.15);border-radius:12px;padding:12px 16px;margin-bottom:12px;">
-          <table style="border-collapse:collapse;width:100%;">
-            ${statsRows}
-          </table>
-        </div>` : ''}
-
-        <!-- Bio -->
+        ${statsRows ? `<div style="background:rgba(74,61,143,0.15);border-radius:12px;padding:12px 16px;margin-bottom:12px;"><table style="border-collapse:collapse;width:100%;">${statsRows}</table></div>` : ''}
         ${bioHtml}
       </div>
-
-      <!-- Divider -->
       <div style="height:1px;background:rgba(74,61,143,0.25);margin:0 32px;"></div>
-
-      <!-- Action buttons -->
       <div style="padding:24px 32px 28px;">
-        <p style="font-size:13px;color:rgba(255,255,255,0.6);margin:0 0 16px;">
-          Accept to connect — WhatsApp will open immediately so you can start planning.
-        </p>
-        <div style="display:flex;gap:12px;flex-wrap:wrap;">
-          <a href="${acceptUrl}"
-            style="display:inline-block;background:#25D366;color:#fff;padding:13px 24px;border-radius:999px;font-weight:700;font-size:14px;text-decoration:none;margin-right:8px;margin-bottom:8px;">
-            Accept &amp; Connect Now
-          </a>
-          <a href="${APP_URL}/my-connections?tab=received"
-            style="display:inline-block;background:transparent;color:#fff;padding:12px 24px;border-radius:999px;font-weight:600;font-size:14px;text-decoration:none;border:2px solid rgba(107,95,160,0.6);margin-bottom:8px;">
-            View Full Profile on CREW
-          </a>
+        <p style="font-size:13px;color:rgba(255,255,255,0.6);margin:0 0 16px;">Accept to connect — WhatsApp will open immediately so you can start planning.</p>
+        <div>
+          <a href="${acceptUrl}" style="display:inline-block;background:#25D366;color:#fff;padding:13px 24px;border-radius:999px;font-weight:700;font-size:14px;text-decoration:none;margin-right:8px;margin-bottom:8px;">Accept &amp; Connect Now</a>
+          <a href="${APP_URL}/my-connections?tab=received" style="display:inline-block;background:transparent;color:#fff;padding:12px 24px;border-radius:999px;font-weight:600;font-size:14px;text-decoration:none;border:2px solid rgba(107,95,160,0.6);margin-bottom:8px;">View in App</a>
         </div>
-        <p style="font-size:11px;color:rgba(255,255,255,0.3);margin:12px 0 0;line-height:1.5;">
-          The Accept &amp; Connect link works for 7 days. After that, accept from My Connections on the CREW website.<br>
-          You are receiving this because you have a CREW account.
-        </p>
+        <p style="font-size:11px;color:rgba(255,255,255,0.3);margin:12px 0 0;line-height:1.5;">The Accept link works for 7 days. After that, accept from My Connections in the app.<br>You are receiving this because you have a CREW account.</p>
       </div>
-
     </div>
-
   </div>
-</body>
-</html>`;
+</body></html>`;
 
     const emailBody = {
       from: `CREW <${FROM_EMAIL}>`,
@@ -208,19 +157,12 @@ Deno.serve(async (req) => {
 
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(emailBody),
     });
-
     const data = await res.json();
     console.log('[send-connection-email] Resend response:', data);
-
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify({ success: true }), { headers: { 'Content-Type': 'application/json' } });
   } catch (err) {
     console.error('[send-connection-email] Error:', err);
     return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
