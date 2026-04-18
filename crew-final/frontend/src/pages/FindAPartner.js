@@ -92,12 +92,22 @@ export default function FindAPartner() {
       ]);
       (sentRes.data || []).forEach(r => { states[r.to_user_id] = 'sent'; });
       (recvRes.data || []).forEach(r => { states[r.from_user_id] = 'received'; });
-      for (const m of (matchRes.data || [])) {
-        const partnerId = m.user1_id === user.id ? m.user2_id : m.user1_id;
-        states[partnerId] = 'matched';
-        const { data: pData } = await supabase.from('profiles').select('phone').eq('id', partnerId).single();
-        if (pData?.phone) phones[partnerId] = pData.phone;
+
+      // ── FIXED: one batched query instead of one query per matched user ──
+      const partnerIds = (matchRes.data || []).map(m =>
+        m.user1_id === user.id ? m.user2_id : m.user1_id
+      );
+      partnerIds.forEach(id => { states[id] = 'matched'; });
+
+      if (partnerIds.length > 0) {
+        const { data: phoneData } = await supabase
+          .from('profiles')
+          .select('id, phone')
+          .in('id', partnerIds);
+        (phoneData || []).forEach(p => { if (p.phone) phones[p.id] = p.phone; });
       }
+      // ── END FIX ──────────────────────────────────────────────────────────
+
       setConnectionStates(states);
       setMatchedPhones(phones);
     };
