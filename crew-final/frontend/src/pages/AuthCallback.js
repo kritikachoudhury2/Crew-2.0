@@ -17,7 +17,6 @@ export default function AuthCallback() {
       return;
     }
 
-    // c) Read redirect param passed from GetStarted magic link / Google OAuth
     const redirectTo = searchParams.get('redirect') || null;
 
     const resolveDestination = async (session) => {
@@ -27,7 +26,10 @@ export default function AuthCallback() {
       } else if (data?.name?.trim()) {
         navigate('/find-a-partner', { replace: true });
       } else {
-        navigate('/get-started', { replace: true });
+        // New user with no profile — show onboarding; existing user
+        // arriving via a connection email shows "Welcome back" because
+        // mode=login is picked up by GetStarted's auth step heading.
+        navigate('/get-started?mode=login', { replace: true });
       }
     };
 
