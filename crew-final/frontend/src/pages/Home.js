@@ -136,8 +136,8 @@ export default function Home() {
               </Link>
             </div>
 
-            {/* Stats */}
-            <div className="flex items-center" style={{ alignSelf: 'flex-start' }}>
+            {/* Stats — FIX d): centered on mobile, no alignSelf constraint */}
+            <div className="flex items-center justify-center sm:justify-start">
               <div className="flex flex-col items-center">
                 <span className="font-inter font-bold text-2xl text-white leading-tight">500+</span>
                 <span className="font-inter text-xs mt-0.5" style={{ color: 'rgba(255,255,255,0.5)' }}>Athletes matched</span>
@@ -149,7 +149,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-          {/* END LEFT COLUMN */}
 
           {/* RIGHT COLUMN */}
           <div className="flex flex-col gap-4 lg:pt-8">
@@ -163,21 +162,10 @@ export default function Home() {
             <HeroProfileCard name="Ayesha N." city="Bangalore" sport="Marathon" matchPct={74} delay={0.25} />
             <HeroProfileCard name="Vikram T." city="Mumbai" sport="HYROX + Marathon" matchPct={68} delay={0.4} />
 
-            {/* GrapeLabs badge */}
             <div className="flex justify-center mt-2">
-              <a
-                href="https://www.grapelabs.in"
-                target="_blank"
-                rel="noopener noreferrer"
+              <a href="https://www.grapelabs.in" target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-inter font-medium uppercase tracking-wider"
-                style={{
-                  fontSize: '10px',
-                  color: '#7C6FD4',
-                  background: 'rgba(124,111,212,0.10)',
-                  border: '1px solid rgba(124,111,212,0.25)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
+                style={{ fontSize: '10px', color: '#7C6FD4', background: 'rgba(124,111,212,0.10)', border: '1px solid rgba(124,111,212,0.25)', whiteSpace: 'nowrap' }}>
                 BUILT USING AI-POWERED SYSTEMS BY&nbsp;
                 <span style={{ textTransform: 'none', color: '#7C6FD4' }}>GrapeLabs</span>&nbsp;
                 <span style={{ textTransform: 'none', color: '#D4880A' }}>AI</span>
@@ -185,7 +173,6 @@ export default function Home() {
               </a>
             </div>
           </div>
-          {/* END RIGHT COLUMN */}
 
         </div>
       </section>
@@ -248,30 +235,15 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               {
-                id: 'showcase-1',
-                name: 'Aryan',
-                city: 'Delhi',
-                area: 'South Delhi',
-                sport: '["hyrox"]',
-                level: 'intermediate',
+                id: 'showcase-1', name: 'Aryan', city: 'Delhi', area: 'South Delhi', sport: '["hyrox"]', level: 'intermediate',
                 bio: "Software engineer who found HYROX two years ago and has not looked back. Training five days a week, targeting sub-90 Open. Looking for someone who takes sessions seriously but keeps it fun.",
               },
               {
-                id: 'showcase-2',
-                name: 'Priya',
-                city: 'Mumbai',
-                area: 'Bandra',
-                sport: '["marathon"]',
-                level: 'advanced',
+                id: 'showcase-2', name: 'Priya', city: 'Mumbai', area: 'Bandra', sport: '["marathon"]', level: 'advanced',
                 bio: "Ran my first full marathon in 4:10, targeting 3:45 at Tata Mumbai 2027. Running 70 km weeks. Looking for a long-run partner who will not cancel on Sunday mornings.",
               },
               {
-                id: 'showcase-3',
-                name: 'Kabir',
-                city: 'Bangalore',
-                area: 'Koramangala',
-                sport: '["hyrox","marathon"]',
-                level: 'advanced',
+                id: 'showcase-3', name: 'Kabir', city: 'Bangalore', area: 'Koramangala', sport: '["hyrox","marathon"]', level: 'advanced',
                 bio: "Founder by day, HYROX Doubles racer on weekends. Also running TCS World 10K every year. Looking for someone who trains across both disciplines and understands the grind.",
               },
             ].map((p) => (
@@ -281,34 +253,21 @@ export default function Home() {
                   <GradientAvatar name={p.name} size={44} />
                   <div className="min-w-0">
                     <p className="font-inter font-semibold text-sm text-white">{p.name}</p>
-                    <p className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                      {p.city} · {p.area}
-                    </p>
+                    <p className="font-inter text-xs" style={{ color: 'rgba(255,255,255,0.5)' }}>{p.city} · {p.area}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {parseSport(p.sport).filter(s => s !== 'ironman').map(s => {
                     const b = sportBadge(s);
-                    return (
-                      <span key={s} className="px-2 py-0.5 rounded-pill text-[10px] font-inter font-bold text-white"
-                        style={{ background: b.bg }}>{b.label}</span>
-                    );
+                    return <span key={s} className="px-2 py-0.5 rounded-pill text-[10px] font-inter font-bold text-white" style={{ background: b.bg }}>{b.label}</span>;
                   })}
-                  {p.level && (
-                    <span className="px-2 py-0.5 rounded-pill text-[10px] font-inter capitalize"
-                      style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)' }}>
-                      {p.level}
-                    </span>
-                  )}
+                  {p.level && <span className="px-2 py-0.5 rounded-pill text-[10px] font-inter capitalize" style={{ border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.5)' }}>{p.level}</span>}
                 </div>
                 <p className="font-inter text-xs mb-3 flex-1"
-                  style={{ color: 'rgba(255,255,255,0.6)', display: '-webkit-box',
-                    WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  style={{ color: 'rgba(255,255,255,0.6)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                   {p.bio}
                 </p>
-                <Link to="/get-started"
-                  className="mt-auto font-inter font-semibold text-xs flex items-center gap-1"
-                  style={{ color: '#D4880A' }}>
+                <Link to="/get-started" className="mt-auto font-inter font-semibold text-xs flex items-center gap-1" style={{ color: '#D4880A' }}>
                   View Profile <ChevronRight size={14} />
                 </Link>
               </div>
@@ -350,8 +309,7 @@ export default function Home() {
           ) : (
             <p className="font-inter text-sm mb-8" style={{ color: 'rgba(255,255,255,0.5)' }}>Loading upcoming events...</p>
           )}
-          <Link to="/events" className="inline-flex items-center gap-2 font-inter font-semibold text-sm"
-            style={{ color: '#D4880A' }}>
+          <Link to="/events" className="inline-flex items-center gap-2 font-inter font-semibold text-sm" style={{ color: '#D4880A' }}>
             See All Events <ArrowRight size={16} />
           </Link>
         </div>
