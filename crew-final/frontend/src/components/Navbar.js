@@ -31,16 +31,9 @@ export default function Navbar() {
 
     fetchPending();
 
-    const channel = supabase.channel(`navbar_pending_${user.id}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'connect_requests',
-        filter: `to_user_id=eq.${user.id}`,
-      }, fetchPending)
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
+    // Poll every 60s — avoids a persistent Realtime connection for a badge
+    const interval = setInterval(fetchPending, 60_000);
+    return () => clearInterval(interval);
   }, [user]);
 
   const handleSignOut = async () => {
